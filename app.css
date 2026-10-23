@@ -346,7 +346,13 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 }
 
 /* ---------------- Arabic */
-[dir=rtl] body, [dir=rtl] input { font-family: -apple-system, "SF Arabic", "Geeza Pro", "Noto Sans Arabic", var(--font); }
+/* Classic Ruqʿah lettering for Arabic (Aref Ruqaa, SIL Open Font License). Arabic-only subset,
+   so English movie titles keep the regular system font. */
+@font-face { font-family: "Lumio Ruqaa"; src: url("fonts/ArefRuqaa-Regular-arabic.ttf") format("truetype"); font-weight: 400 500; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: "Lumio Ruqaa"; src: url("fonts/ArefRuqaa-Bold-arabic.ttf") format("truetype"); font-weight: 600 900; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+[dir=rtl] { --font: "Lumio Ruqaa", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --display: "Lumio Ruqaa", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+[dir=rtl] body { font-size: 16px; }
+[dir=rtl] input, [dir=rtl] button { font-family: var(--font); }
 [dir=rtl] .tile, [dir=rtl] .ep, [dir=rtl] .stream, [dir=rtl] .opt { text-align: right; }
 [dir=rtl] .tile .emoji { right: auto; left: 10px; }
 
