@@ -327,5 +327,10 @@ window.LUMIO_AR = {
 "Enter a valid email address": "أدخل بريدًا إلكترونيًا صحيحًا",
 "Account": "الحساب",
 "Switch account": "تبديل الحساب",
+"Navigation bar position": "موضع شريط التنقل",
+"Left": "يسار",
+"Right": "يمين",
+"Floating": "عائم",
+"For the Fold's inner screen and tablets. Floating gives the content the whole screen and hides while you scroll.": "للشاشة الداخلية لـ Fold والأجهزة اللوحية. الوضع العائم يمنح المحتوى الشاشة كاملة ويختفي أثناء التمرير.",
 "Your library, history and settings belong to this email": "مكتبتك وسجلّك وإعداداتك مرتبطة بهذا البريد"
 };
