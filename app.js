@@ -95,6 +95,12 @@ const P = {
   aspect: 'M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z',
   phone: 'M15.5 1h-8A2.5 2.5 0 0 0 5 3.5v17A2.5 2.5 0 0 0 7.5 23h8a2.5 2.5 0 0 0 2.5-2.5v-17A2.5 2.5 0 0 0 15.5 1zm-4 21c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4.5-4H7V4h9v14z',
   open: 'M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z',
+  lock: 'M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z',
+  unlock: 'M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z',
+  replay: 'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z',
+  remove: 'M7 11v2h10v-2H7zm5-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z',
+  checkC: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z',
+  lang: 'M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z',
 };
 const ic = (name, extra = '') => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" ${extra}><path d="${P[name]}"/></svg>`;
 const ic10 = name => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${P[name]}"/><text x="12" y="16.3" text-anchor="middle" font-size="6.5" font-weight="700" fill="currentColor">10</text></svg>`;
@@ -107,11 +113,11 @@ const store = {
 const DEFAULT_SETTINGS = {
   tmdbKey: '', region: 'US', accent: 'violet', customAccent: '#7C5CFF', amoled: false,
   skipIntro: 'button', skipRecap: 'button', skipCredits: 'button', skipNudity: false,
-  subLang: 'en', subScale: 1, subBg: true, autoNext: true, addons: null,
+  subLang: 'en', subScale: 1, subBg: true, autoNext: true, addons: null, lang: 'en',
 };
 let S = Object.assign({}, DEFAULT_SETTINGS, store.get('settings', {}));
 if (!S.addons) S.addons = BUILT_IN_ADDONS.slice();
-const saveSettings = () => { store.set('settings', S); applyTheme(); };
+const saveSettings = () => { store.set('settings', S); applyTheme(); applyLang(); };
 let LIB = store.get('library', []);
 const saveLib = () => store.set('library', LIB.slice(0, 500));
 const libEntry = (type, id) => LIB.find(e => e.type === type && e.id === id);
@@ -137,6 +143,15 @@ function applyTheme() {
   cue.textContent = `::cue { font-size: ${Math.round(S.subScale * 100)}%; }`;
 }
 
+// ============================================================================ language
+/** Translate UI text to Arabic when chosen. Movie & show titles are never translated. */
+const T = s => (S.lang === 'ar' && window.LUMIO_AR && window.LUMIO_AR[s]) || s;
+function applyLang() {
+  const ar = S.lang === 'ar';
+  document.documentElement.lang = ar ? 'ar' : 'en';
+  document.documentElement.dir = ar ? 'rtl' : 'ltr';
+}
+
 // ============================================================================ helpers
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -145,7 +160,7 @@ const titleOf = x => x.title || x.name || '';
 const fmt = ms => { const t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60; return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`; };
 const langName = c => { if (!c || c === 'und') return null; try { return new Intl.DisplayNames(['en'], { type: 'language' }).of(c) || c; } catch { return c; } };
 let toastTimer;
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
+function toast(msg) { const t = $('#toast'); t.textContent = T(msg); t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200); }
 
 async function getJSON(url, timeout = 15000) {
   const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), timeout);
@@ -241,28 +256,30 @@ async function introSegments(type, id, season, episode, durMs) {
 
 // ============================================================================ views: shared pieces
 function img(src, alt = '') { return src ? `<img src="${esc(src)}" alt="${esc(alt)}" loading="lazy" decoding="async" onload="this.classList.add('ok')">` : ''; }
-function posterCard(x, i = 0, prog) {
-  const t = x.media_type || 'movie';
-  return `<a class="poster fly" style="animation-delay:${Math.min(i, 12) * 28}ms" href="#/details/${t}/${x.id}">
+const badgesHTML = e => `${e && e.watched ? `<span class="watched" title="${T('Watched')}">${ic('check')}</span>` : ''}${e && e.pin ? `<span class="locked">${ic('lock')}</span>` : ''}`;
+function posterCard(x, i = 0, prog, cont) {
+  const t = x.media_type || 'movie', e = libEntry(t, x.id);
+  return `<a class="poster fly" style="animation-delay:${Math.min(i, 12) * 28}ms" href="#/details/${t}/${x.id}" data-k="${t}-${x.id}" data-type="${t}" data-id="${x.id}" ${cont ? 'data-cont="1"' : ''} data-title="${esc(titleOf(x))}" data-poster="${esc(x.poster_path || '')}" data-year="${yearOf(x)}">
     <div class="art">${img(x.poster_path && IMG + 'w342' + x.poster_path, titleOf(x))}
       ${x.vote_average ? `<span class="rate"><b>★</b> ${x.vote_average.toFixed(1)}</span>` : ''}
+      <span class="badges">${badgesHTML(e)}</span>
       ${prog ? `<span class="prog"><i style="width:${prog * 100}%"></i></span>` : ''}</div>
     <div class="t">${esc(titleOf(x))}</div>${yearOf(x) ? `<div class="y">${yearOf(x)}</div>` : ''}</a>`;
 }
-const rail = (title, items, progress) => items && items.length ? `<div class="rail-title gutter">${esc(title)}</div><div class="rail gutter">${items.map((x, i) => posterCard(x, i, progress && progress(x))).join('')}</div>` : '';
-const sectionH = (t, sub) => `<div class="section-h gutter"><div><h2>${esc(t)}</h2><div class="bar"></div>${sub ? `<p>${esc(sub)}</p>` : ''}</div></div>`;
+const rail = (title, items, progress, cont) => items && items.length ? `<div class="rail-title gutter">${esc(T(title))}</div><div class="rail gutter">${items.map((x, i) => posterCard(x, i, progress && progress(x), cont)).join('')}</div>` : '';
+const sectionH = (t, sub) => `<div class="section-h gutter"><div><h2>${esc(T(t))}</h2><div class="bar"></div>${sub ? `<p>${esc(T(sub))}</p>` : ''}</div></div>`;
 const skeletonRows = () => Array.from({ length: 3 }, () => `<div class="gutter" style="padding-top:22px"><div class="sk" style="width:140px;height:18px;margin-bottom:10px"></div><div style="display:flex;gap:12px;overflow:hidden">${Array.from({ length: 6 }, () => '<div class="sk" style="flex:0 0 var(--poster);aspect-ratio:2/3"></div>').join('')}</div></div>`).join('');
-const msg = (h, p, action = '') => `<div class="msg"><h3>${esc(h)}</h3><p>${esc(p)}</p>${action}</div>`;
+const msg = (h, p, action = '') => `<div class="msg"><h3>${esc(T(h))}</h3><p>${esc(T(p))}</p>${action}</div>`;
 const logoHTML = (s, i, size) => s.logo ? `<span class="logo m-${s.motion}" style="--c1:${s.c1};--d:${(i % 5) * .45}s;animation-delay:${100 + i * 60}ms${size ? `;width:${size}px;height:${size}px;border-radius:${size * .25}px` : ''}"><img src="${IMG}w154${s.logo}" alt=""><span class="sheen"></span></span>` : '';
 const tileStyle = (c1, c2, i) => `--c1:${c1};--c2:${c2};--ang:${120 + (i * 37) % 120}deg;animation-delay:${i * 45}ms,0s`;
 
 function discoverSections() {
   return `${sectionH('Discover', 'Curated lists, updated daily')}
-  <div class="rail gutter">${DISCOVER.map((d, i) => `<a class="tile discover" href="#/catalog/discover/${d.key}" style="${tileStyle(d.c1, d.c2, i)}"><span class="emoji" style="animation-delay:${i * .3}s">${d.emoji}</span><span class="lbl"><b>${esc(d.name)}</b><small>${esc(d.sub)}</small></span></a>`).join('')}</div>
+  <div class="rail gutter">${DISCOVER.map((d, i) => `<a class="tile discover" href="#/catalog/discover/${d.key}" style="${tileStyle(d.c1, d.c2, i)}"><span class="emoji" style="animation-delay:${i * .3}s">${d.emoji}</span><span class="lbl"><b>${esc(T(d.name))}</b><small>${esc(T(d.sub))}</small></span></a>`).join('')}</div>
   ${sectionH('Streaming Services', 'Browse every catalog')}
   <div class="rail gutter" id="services-rail">${servicesHTML(SERVICES.filter(s => s.logo))}</div>
   ${sectionH('Genres', 'Something for every mood')}
-  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(g.name)}</b></span></a>`).join('')}</div>`;
+  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>`;
 }
 const servicesHTML = list => list.map((s, i) => `<a class="tile service" href="#/catalog/service/${s.key}" style="${tileStyle(s.c1, s.c2, i)}">${logoHTML(s, i)}<b>${esc(s.name)}</b></a>`).join('');
 function mountDiscover(root) {
@@ -277,7 +294,7 @@ const TABS = [['home', 'Home', 'home'], ['search', 'Search', 'search'], ['librar
 const scrollMemo = {};
 function renderNav(active) {
   const nav = $('#nav');
-  nav.innerHTML = TABS.map(([k, l, i]) => `<a class="nav-item ${k === active ? 'on' : ''}" href="#/${k}" aria-label="${l}">${ic(i)}<span class="lbl">${l}</span></a>`).join('');
+  nav.innerHTML = TABS.map(([k, l, i]) => `<a class="nav-item ${k === active ? 'on' : ''}" href="#/${k}" aria-label="${T(l)}">${ic(i)}<span class="lbl">${T(l)}</span></a>`).join('');
   nav.classList.toggle('hidden', !active);
   view.classList.toggle('no-nav', !active);
 }
@@ -305,7 +322,7 @@ async function route() {
       default: location.replace('#/home'); return;
     }
   } catch (e) {
-    if (token === routeToken) view.innerHTML = msg("Couldn't load", e.message || 'Network error', '<button class="btn acc" onclick="route()">Retry</button>');
+    if (token === routeToken) view.innerHTML = msg("Couldn't load", e.message || 'Network error', `<button class="btn acc" onclick="route()">${T("Retry")}</button>`);
   }
   requestAnimationFrame(() => window.scrollTo(0, scrollMemo[hash] || 0));
 }
@@ -326,7 +343,7 @@ async function homeView(token) {
       <div class="hero-track" id="hero-track">${hero.map(x => `<div class="hero-slide">${img(wide ? IMG + 'w1280' + x.backdrop_path : IMG + 'w780' + (x.poster_path || x.backdrop_path), titleOf(x))}</div>`).join('')}</div>
       <div class="hero-info gutter" id="hero-info"></div>
     </section>
-    ${rail('Continue Watching', cont, x => progressOf(libEntry(x.media_type, x.id)))}
+    ${rail('Continue Watching', cont, x => progressOf(libEntry(x.media_type, x.id)), true)}
     ${discoverSections()}
     ${rail('Trending This Week', trend)}${rail('Popular Movies', popM)}${rail('Popular Shows', popT)}
     ${rail('In Theaters', now)}${rail('Airing Now', air)}${rail('Top Rated Movies', topM)}${rail('Top Rated Shows', topT)}`;
@@ -336,9 +353,9 @@ async function homeView(token) {
   let idx = -1;
   const show = i => {
     if (i === idx || !hero[i]) return; idx = i; const x = hero[i];
-    info.innerHTML = `<h1>${esc(titleOf(x))}</h1><div class="meta"><span class="badge acc">${x.media_type === 'tv' ? 'SERIES' : 'MOVIE'}</span>${yearOf(x) ? `<span>${yearOf(x)}</span>` : ''}${x.vote_average ? `<span>★ ${x.vote_average.toFixed(1)}</span>` : ''}</div>
+    info.innerHTML = `<h1>${esc(titleOf(x))}</h1><div class="meta"><span class="badge acc">${T(x.media_type === 'tv' ? 'SERIES' : 'MOVIE')}</span>${yearOf(x) ? `<span>${yearOf(x)}</span>` : ''}${x.vote_average ? `<span>★ ${x.vote_average.toFixed(1)}</span>` : ''}</div>
       ${wide ? `<p class="dim" style="margin:0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${esc(x.overview)}</p>` : ''}
-      <div class="row-btns" style="justify-content:${wide ? 'flex-start' : 'center'}"><a class="btn white" href="#/details/${x.media_type}/${x.id}">${ic('play')}Play</a><a class="btn tonal" href="#/details/${x.media_type}/${x.id}">${ic('info')}Details</a></div>
+      <div class="row-btns" style="justify-content:${wide ? 'flex-start' : 'center'}"><a class="btn white" href="#/details/${x.media_type}/${x.id}">${ic('play')}${T("Play")}</a><a class="btn tonal" href="#/details/${x.media_type}/${x.id}">${ic('info')}${T("Details")}</a></div>
       <div class="dots">${hero.map((_, j) => `<i class="${j === i ? 'on' : ''}"></i>`).join('')}</div>`;
     info.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 350, easing: 'ease-out' });
   };
@@ -353,7 +370,7 @@ async function homeView(token) {
 
 // ============================================================================ search
 function searchView() {
-  view.innerHTML = `<div class="search gutter"><label>${ic('search')}<input id="q" type="search" placeholder="Search movies & shows" autocomplete="off" enterkeyhint="search"></label></div><div id="results"></div>`;
+  view.innerHTML = `<div class="search gutter"><label>${ic('search')}<input id="q" type="search" placeholder="${T('Search movies & shows')}" autocomplete="off" enterkeyhint="search"></label></div><div id="results"></div>`;
   const input = $('#q'), out = $('#results');
   const empty = () => { out.innerHTML = discoverSections(); mountDiscover(out); };
   empty();
@@ -376,9 +393,9 @@ function searchView() {
 function libraryView(tab = 'watchlist') {
   const tabs = [['watchlist', 'Watchlist'], ['continue', 'Continue Watching'], ['history', 'History']];
   const list = tab === 'continue' ? LIB.filter(isContinue) : tab === 'history' ? LIB.filter(e => e.pos > 0) : LIB.filter(e => e.watch);
-  view.innerHTML = `<h1 class="page-title gutter">Library</h1>
-    <div class="chips gutter">${tabs.map(([k, l]) => `<a class="chip ${k === tab ? 'on' : ''}" style="display:grid;place-items:center" href="#/library/${k}">${l}</a>`).join('')}</div>
-    ${list.length ? `<div class="gutter" style="padding-top:12px"><div class="grid">${list.map((e, i) => posterCard({ id: e.id, media_type: e.type, title: e.title, poster_path: e.poster }, i, tab === 'watchlist' ? 0 : progressOf(e))).join('')}</div></div>`
+  view.innerHTML = `<h1 class="page-title gutter">${T("Library")}</h1>
+    <div class="chips gutter">${tabs.map(([k, l]) => `<a class="chip ${k === tab ? 'on' : ''}" style="display:grid;place-items:center" href="#/library/${k}">${T(l)}</a>`).join('')}</div>
+    ${list.length ? `<div class="gutter" style="padding-top:12px"><div class="grid">${list.map((e, i) => posterCard({ id: e.id, media_type: e.type, title: e.title, poster_path: e.poster }, i, tab === 'watchlist' ? 0 : progressOf(e), tab === 'continue')).join('')}</div></div>`
       : msg('Nothing here yet', tab === 'watchlist' ? 'Tap the bookmark on any title to save it.' : 'Start watching something!')}`;
 }
 
@@ -401,10 +418,10 @@ async function catalogView(kind, key, token) {
   view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
     <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.genre ? `<canvas id="bn-scene"></canvas>` : ''}
       <div class="ttl">${info.service ? logoHTML(info.service, 0, 58) : (!info.genre && info.emoji ? `<span style="font-size:44px" class="emoji-b">${info.emoji}</span>` : '')}
-        <div><h1>${esc(info.title)}</h1><p>${esc(info.sub)}</p></div></div></div>
+        <div><h1>${esc(info.service ? info.title : T(info.title))}</h1><p>${esc(info.service ? `${T('Streaming now on')} ${info.title}` : info.genre ? (S.lang === 'ar' ? `أفضل عناوين ${T(info.title)}` : info.sub) : T(info.sub))}</p></div></div></div>
     <div class="gutter">
-      ${info.mq != null && info.tq != null ? `<div class="chips" id="types"><button class="chip on" data-t="movie">Movies</button><button class="chip" data-t="tv">Shows</button></div>` : ''}
-      ${info.sortable ? `<div class="chips" id="sorts" style="padding-top:2px">${SORTS.map(([k, l], i) => `<button class="chip sm ${i ? '' : 'on'}" data-s="${k}">${l}</button>`).join('')}</div>` : ''}
+      ${info.mq != null && info.tq != null ? `<div class="chips" id="types"><button class="chip on" data-t="movie">${T("Movies")}</button><button class="chip" data-t="tv">${T("Shows")}</button></div>` : ''}
+      ${info.sortable ? `<div class="chips" id="sorts" style="padding-top:2px">${SORTS.map(([k, l], i) => `<button class="chip sm ${i ? '' : 'on'}" data-s="${k}">${T(l)}</button>`).join('')}</div>` : ''}
       <div class="grid" id="cgrid" style="padding-top:12px"></div><div id="cmore" style="height:1px"></div>
     </div>`;
   if (info.genre) GenreScenes.attach($('#bn-scene'), info.genre, 0);
@@ -450,26 +467,27 @@ async function forYou() {
 // ============================================================================ details
 async function detailsView(type, id, token) {
   view.innerHTML = `<div class="sk" style="height:min(560px,72vh);border-radius:0"></div>`;
+  if (await lockGate(type, id, token)) return;
   const d = await api.details(type, id);
   if (token !== routeToken) return;
   const e = libEntry(type, id), resume = isContinue(e) ? e : null, wide = innerWidth >= 700;
   const seasons = (d.seasons || []).filter(s => s.season_number > 0);
   let season = resume?.season || seasons[0]?.season_number || 1;
   const runtime = d.runtime || (d.episode_run_time || [])[0];
-  const playLabel = resume ? (type === 'tv' ? `Resume S${resume.season}E${resume.episode}` : 'Resume') : type === 'tv' ? `Play S${season}E1` : 'Play';
+  const playLabel = resume ? (type === 'tv' ? `${T('Resume')} S${resume.season}E${resume.episode}` : T('Resume')) : type === 'tv' ? `${T('Play')} S${season}E1` : T('Play');
   const playHref = type === 'tv' ? `#/streams/tv/${id}/${resume?.season || season}/${resume?.episode || 1}` : `#/streams/movie/${id}/-/-`;
   view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
     <div class="backdrop">${img(d.backdrop_path && IMG + (wide ? 'original' : 'w1280') + d.backdrop_path)}
       <div class="d-info gutter"><div class="pst">${img(d.poster_path && IMG + 'w342' + d.poster_path)}</div>
         <div style="min-width:0;max-width:640px"><h1>${esc(titleOf(d))}</h1>${d.tagline ? `<div class="tag">${esc(d.tagline)}</div>` : ''}
-          <div class="meta">${yearOf(d) ? `<span class="badge">${yearOf(d)}</span>` : ''}${d.vote_average ? `<span class="badge">★ ${d.vote_average.toFixed(1)}</span>` : ''}${runtime ? `<span class="badge">${Math.floor(runtime / 60) ? Math.floor(runtime / 60) + 'h ' : ''}${runtime % 60}m</span>` : ''}${type === 'tv' ? `<span class="badge">${seasons.length} Seasons</span>` : ''}</div>
+          <div class="meta">${yearOf(d) ? `<span class="badge">${yearOf(d)}</span>` : ''}${d.vote_average ? `<span class="badge">★ ${d.vote_average.toFixed(1)}</span>` : ''}${runtime ? `<span class="badge">${Math.floor(runtime / 60) ? Math.floor(runtime / 60) + 'h ' : ''}${runtime % 60}m</span>` : ''}${type === 'tv' ? `<span class="badge">${seasons.length} ${T("Seasons")}</span>` : ''}</div>
           <div class="genres">${esc((d.genres || []).map(g => g.name).join(' • '))}</div>
           <div class="row-btns"><a class="btn white" href="${playHref}">${ic('play')}${esc(playLabel)}</a>
           <button class="icon-btn" id="wl" style="background:rgba(255,255,255,.14)" aria-label="Watchlist">${ic(e?.watch ? 'bookmark' : 'bookmarkO')}</button></div>
         </div></div></div>
     <p class="overview gutter">${esc(d.overview)}</p>
     ${type === 'tv' ? `<div class="chips gutter" id="seasons">${seasons.map(s => `<button class="chip ${s.season_number === season ? 'on' : ''}" data-n="${s.season_number}">${esc(s.name)}</button>`).join('')}</div><div class="eps gutter" id="eps"></div>` : ''}
-    ${(d.credits?.cast || []).length ? `<div class="rail-title gutter">Cast</div><div class="rail gutter">${d.credits.cast.slice(0, 20).map(c => `<div class="cast">${c.profile_path ? `<img src="${IMG}w185${c.profile_path}" alt="" loading="lazy">` : '<div class="ph"></div>'}<span>${esc(c.name)}</span><span class="dim">${esc(c.character || '')}</span></div>`).join('')}</div>` : ''}`;
+    ${(d.credits?.cast || []).length ? `<div class="rail-title gutter">${T("Cast")}</div><div class="rail gutter">${d.credits.cast.slice(0, 20).map(c => `<div class="cast">${c.profile_path ? `<img src="${IMG}w185${c.profile_path}" alt="" loading="lazy">` : '<div class="ph"></div>'}<span>${esc(c.name)}</span><span class="dim">${esc(c.character || '')}</span></div>`).join('')}</div>` : ''}`;
   $('#wl').onclick = () => {
     updateLib(type, id, cur => Object.assign(cur || { type, id, title: titleOf(d), poster: d.poster_path, backdrop: d.backdrop_path, pos: 0, dur: 0 }, { watch: !(cur && cur.watch) }));
     const on = libEntry(type, id)?.watch; $('#wl').innerHTML = ic(on ? 'bookmark' : 'bookmarkO'); toast(on ? 'Added to Watchlist' : 'Removed from Watchlist');
@@ -493,21 +511,22 @@ async function detailsView(type, id, token) {
 
 // ============================================================================ streams
 async function streamsView(type, id, season, episode, token) {
+  if (await lockGate(type, id, token)) return;
   const d = await api.details(type, id);
   if (token !== routeToken) return;
   const imdb = d.imdb_id || d.external_ids?.imdb_id;
   view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
     <div class="backdrop" style="height:220px">${img(d.backdrop_path && IMG + 'w1280' + d.backdrop_path)}
-      <div class="d-info gutter" style="bottom:12px"><div><h1 style="font-size:24px">${esc(titleOf(d))}</h1>${season != null ? `<div class="dim">Season ${season} • Episode ${episode}</div>` : ''}</div></div></div>
+      <div class="d-info gutter" style="bottom:12px"><div><h1 style="font-size:24px">${esc(titleOf(d))}</h1>${season != null ? `<div class="dim">${T('Season')} ${season} • ${T('Episode')} ${episode}</div>` : ''}</div></div></div>
     <div class="gutter"><div class="row-btns" style="padding:8px 0 4px">
-      <button class="btn outline" id="purl">${ic('link')}Play link</button>
-      <label class="btn outline" style="cursor:pointer">${ic('folder')}Local file<input type="file" accept="video/*" id="pfile" hidden></label></div>
+      <button class="btn outline" id="purl">${ic('link')}${T("Play link")}</button>
+      <label class="btn outline" style="cursor:pointer">${ic('folder')}${T("Local file")}<input type="file" accept="video/*" id="pfile" hidden></label></div>
       <div class="chips" id="sfil"></div><div class="list" id="slist">${Array.from({ length: 5 }, () => '<div class="sk" style="height:76px"></div>').join('')}</div></div>`;
   const play = (url, extra = {}) => startPlayer(Object.assign({ url, title: titleOf(d), subtitle: season != null ? `S${season} • E${episode}` : yearOf(d), type, id, imdb, season, episode, poster: d.poster_path, backdrop: d.backdrop_path }, extra));
   $('#purl').onclick = () => promptSheet('Play a link', 'https://…/video.m3u8 or .mp4', url => play(url));
   $('#pfile').onchange = e => { const f = e.target.files[0]; if (f) play(URL.createObjectURL(f), { title: f.name, local: true }); };
   const list = $('#slist');
-  if (!S.addons.some(a => supports(a, 'stream'))) { list.innerHTML = msg('No stream addon installed yet', 'Add one in Settings → Stream addons, or play a link / file above.', '<a class="btn acc" href="#/settings">Open Settings</a>'); return; }
+  if (!S.addons.some(a => supports(a, 'stream'))) { list.innerHTML = msg('No stream addon installed yet', 'Add one in Settings → Stream addons, or play a link / file above.', `<a class="btn acc" href="#/settings">${T("Open Settings")}</a>`); return; }
   if (!imdb) { list.innerHTML = msg('No streams', "This title has no IMDb id, so addons can't look it up."); return; }
   const streams = await getStreams(type, imdb, season, episode);
   if (!list.isConnected) return;
@@ -531,14 +550,14 @@ async function streamsView(type, id, season, episode, token) {
 function closeSheet() { $('#sheet-root').innerHTML = ''; }
 function sheet(title, opts, extraHTML = '') {
   const root = $('#sheet-root');
-  root.innerHTML = `<div class="sheet-bg"></div><div class="sheet" role="dialog" aria-label="${esc(title)}"><div class="grab"></div><h3>${esc(title)}</h3>
-    ${opts.map((o, i) => `<button class="opt ${o.on ? 'on' : ''}" data-i="${i}">${o.icon ? ic(o.icon) : ''}<div>${esc(o.t)}${o.s ? `<small>${esc(o.s)}</small>` : ''}</div>${o.on ? `<span class="chk">${ic('check', 'width="20" height="20"')}</span>` : ''}</button>`).join('')}${extraHTML}</div>`;
+  root.innerHTML = `<div class="sheet-bg"></div><div class="sheet" role="dialog" aria-label="${esc(T(title))}"><div class="grab"></div><h3>${esc(T(title))}</h3>
+    ${opts.map((o, i) => `<button class="opt ${o.on ? 'on' : ''}" data-i="${i}">${o.icon ? ic(o.icon) : ''}<div>${esc(T(o.t))}${o.s ? `<small>${esc(T(o.s))}</small>` : ''}</div>${o.on ? `<span class="chk">${ic('check', 'width="20" height="20"')}</span>` : ''}</button>`).join('')}${extraHTML}</div>`;
   $('.sheet-bg', root).onclick = closeSheet;
   root.querySelectorAll('.opt').forEach(b => b.onclick = () => { const o = opts[+b.dataset.i]; if (o.keep !== true) closeSheet(); o.fn && o.fn(); });
   return root;
 }
 function promptSheet(title, placeholder, onOk) {
-  const root = sheet(title, [], `<form class="pad" id="pf"><input class="field" id="pv" type="url" placeholder="${esc(placeholder)}" autocomplete="off" required><button class="btn acc" type="submit">OK</button></form>`);
+  const root = sheet(title, [], `<form class="pad" id="pf"><input class="field" id="pv" type="url" placeholder="${esc(placeholder)}" autocomplete="off" required><button class="btn acc" type="submit">${T("OK")}</button></form>`);
   const f = $('#pf', root); setTimeout(() => $('#pv', root).focus(), 50);
   f.onsubmit = e => { e.preventDefault(); const v = $('#pv', root).value.trim(); closeSheet(); if (v) onOk(v); };
 }
@@ -594,7 +613,7 @@ function closePlayer(fromRoute, skipSave) {
 }
 function saveProgress() {
   const r = PLAYER.req, v = PLAYER.v; if (!r || !v || !r.id || r.local || !isFinite(v.duration) || !v.duration) return;
-  updateLib(r.type, r.id, cur => Object.assign(cur || { type: r.type, id: r.id, title: r.title, poster: r.poster, backdrop: r.backdrop }, { pos: v.currentTime * 1000, dur: v.duration * 1000, season: r.season, episode: r.episode, url: r.url }));
+  updateLib(r.type, r.id, cur => Object.assign(cur || { type: r.type, id: r.id, title: r.title, poster: r.poster, backdrop: r.backdrop }, { pos: v.currentTime * 1000, dur: v.duration * 1000, season: r.season, episode: r.episode, url: r.url, imdb: r.imdb || (cur && cur.imdb), addon: r.addon || (cur && cur.addon) }));
 }
 function openPlayer() {
   if (PLAYER.el) closePlayer(true, true); // switching episode: progress already saved
@@ -607,8 +626,8 @@ function openPlayer() {
         <button class="icon-btn" id="pair" aria-label="AirPlay">${ic('airplay')}</button><button class="icon-btn" id="ppip" aria-label="Picture in picture">${ic('pip')}</button></div>
       <div class="p-mid"><button id="prew" aria-label="Back 10 seconds">${ic10('rew')}</button><button class="p-play" id="ppp" aria-label="Play or pause">${ic('play')}</button><button id="pfwd" aria-label="Forward 10 seconds">${ic10('fwd')}</button></div>
       <div class="p-bot"><div class="p-time"><span id="tcur">0:00</span><div class="p-seek" id="seek"><div class="tr"><div class="buf" id="sbuf"></div><div class="cur" id="scur"></div></div><div class="th" id="sth"></div></div><span id="tleft">-0:00</span></div>
-        <div class="p-btns"><button id="bsub">${ic('subs')}<span>Subtitles</span></button><button id="baud">${ic('audio')}<span>Audio</span></button><button id="bspd">${ic('speed')}<span>Speed</span></button>
-          <button id="bsize">${ic('aspect')}<span>Size</span></button><button id="bscn">${ic('eyeOff')}<span>Scenes</span></button><button id="bopen">${ic('open')}<span>Open in…</span></button><button id="bfull">${ic('full')}<span>Full screen</span></button></div></div>
+        <div class="p-btns"><button id="bsub">${ic('subs')}<span>${T("Subtitles")}</span></button><button id="baud">${ic('audio')}<span>${T("Audio")}</span></button><button id="bspd">${ic('speed')}<span>${T("Speed")}</span></button>
+          <button id="bsize">${ic('aspect')}<span>${T("Size")}</span></button><button id="bscn">${ic('eyeOff')}<span>${T("Scenes")}</span></button><button id="bopen">${ic('open')}<span>${T("Open in…")}</span></button><button id="bfull">${ic('full')}<span>${T("Full screen")}</span></button></div></div>
     </div>`;
   document.body.appendChild(el); document.body.style.overflow = 'hidden';
   const v = $('video', el); PLAYER.el = el; PLAYER.v = v;
@@ -639,7 +658,7 @@ function openPlayer() {
     const mkv = /\.(mkv|avi)(\?|$)/i.test(r.url);
     const box = document.createElement('div'); box.className = 'p-err';
     box.innerHTML = `<div><h3>Can't play this here</h3><p class="dim">${mkv ? "Safari can't play MKV files. Open it in Infuse or VLC instead (both free on the App Store)." : 'This source failed to load in Safari. Try another source, or open it in another player.'}</p>
-      <div class="row-btns" style="justify-content:center"><button class="btn white" id="eopen">${ic('open')}Open in…</button><button class="btn tonal" id="eclose">Close</button></div></div>`;
+      <div class="row-btns" style="justify-content:center"><button class="btn white" id="eopen">${ic('open')}${T("Open in…")}</button><button class="btn tonal" id="eclose">${T("Close")}</button></div></div>`;
     el.appendChild(box); spin.hidden = true;
     $('#eopen', box).onclick = openIn; $('#eclose', box).onclick = () => closePlayer();
   });
@@ -694,7 +713,7 @@ function openPlayer() {
     opts.push({ t: 'Import subtitle file…', s: '.srt  .vtt  .ass  .ssa', icon: 'folder', fn: () => pickFile('.srt,.vtt,.ass,.ssa,.txt,text/*', f => f.text().then(t => addFromText(t, f.name, 'und'))) });
     opts.push({ t: 'Load subtitle from URL…', icon: 'link', fn: () => promptSheet('Subtitle URL', 'https://…/subtitle.srt', u => fetch(u).then(x => x.text()).then(t => addFromText(t, u.split('/').pop().split('?')[0] || 'Subtitle', 'und')).catch(() => toast("Couldn't load that subtitle (the site may block it)"))) });
     if (r.imdb) opts.push({ t: 'Search online subtitles', s: 'From your installed addons', icon: 'search', fn: onlineSubs });
-    opts.push({ t: `Subtitle size: ${Math.round(S.subScale * 100)}%`, s: 'Tap to cycle', icon: 'subs', keep: true, fn: () => { S.subScale = S.subScale >= 2 ? .6 : Math.round((S.subScale + .2) * 10) / 10; saveSettings(); subtitlesSheet(); } });
+    opts.push({ t: `${T('Subtitle size')}: ${Math.round(S.subScale * 100)}%`, s: 'Tap to cycle', icon: 'subs', keep: true, fn: () => { S.subScale = S.subScale >= 2 ? .6 : Math.round((S.subScale + .2) * 10) / 10; saveSettings(); subtitlesSheet(); } });
     sheet('Subtitles', opts);
   }
   async function onlineSubs() {
@@ -732,7 +751,7 @@ function openPlayer() {
     $('.mark-chip', el)?.remove();
     if (st.markStart == null) return;
     const c = document.createElement('div'); c.className = 'mark-chip';
-    c.innerHTML = `<i></i>Marking from ${fmt(st.markStart)}<button id="mend">Set end</button><button id="mx" aria-label="Cancel">${ic('close', 'width="18" height="18"')}</button>`;
+    c.innerHTML = `<i></i>Marking from ${fmt(st.markStart)}<button id="mend">${T("Set end")}</button><button id="mx" aria-label="Cancel">${ic('close', 'width="18" height="18"')}</button>`;
     el.appendChild(c); $('#mend', c).onclick = markEnd; $('#mx', c).onclick = () => { st.markStart = null; drawMark(); };
   }
   let pill = null;
@@ -814,47 +833,165 @@ function pickFile(accept, cb) { const i = document.createElement('input'); i.typ
 document.addEventListener('visibilitychange', () => { if (document.hidden) saveProgress(); });
 addEventListener('pagehide', saveProgress);
 
+// ============================================================================ long-press menus, watched & PIN lock
+const unlocked = new Set();
+const lockKey = (t, id) => `${t}-${id}`;
+async function pinHash(type, id, pin) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`lumio:${type}:${id}:${pin}`));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function refreshBadges(type, id) {
+  const e = libEntry(type, id);
+  document.querySelectorAll(`.poster[data-k="${type}-${id}"] .badges`).forEach(b => { b.innerHTML = badgesHTML(e); });
+}
+function closePop() { document.querySelectorAll('.pop-bg').forEach(x => x.remove()); }
+/** Small centred window with a header and options (iOS-style context menu). */
+function popup(header, opts) {
+  closePop();
+  const bg = document.createElement('div'); bg.className = 'pop-bg';
+  bg.innerHTML = `<div class="pop" role="dialog">${header}<div class="pop-opts">${opts.map((o, i) => `<button class="opt" data-i="${i}" style="animation-delay:${i * 40}ms">${ic(o.icon)}<div>${esc(T(o.t))}${o.s ? `<small>${esc(T(o.s))}</small>` : ''}</div></button>`).join('')}</div></div>`;
+  bg.onclick = e => { if (e.target === bg) closePop(); };
+  bg.querySelectorAll('.opt').forEach(b => b.onclick = () => { closePop(); opts[+b.dataset.i].fn(); });
+  document.body.appendChild(bg);
+}
+/** 4-digit PIN pad. setNew → enter + confirm, resolves with the PIN; otherwise resolves true once `check(pin)` passes. */
+function pinPad({ title, setNew, check }) {
+  return new Promise(resolve => {
+    closePop();
+    const bg = document.createElement('div'); bg.className = 'pop-bg';
+    let pin = '', first = null;
+    const head = () => T(setNew ? (first == null ? 'Enter a new PIN' : 'Re-enter the PIN to confirm') : 'Enter PIN');
+    bg.innerHTML = `<div class="pop pin" role="dialog"><div class="pin-ic">${ic('lock')}</div><h3 id="pinh">${head()}</h3><small class="dim">${esc(title)}</small>
+      <div class="dots4" id="dots">${'<i></i>'.repeat(4)}</div><div class="pin-err" id="perr">&nbsp;</div>
+      <div class="pad">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map(k => k ? `<button data-k="${k}" aria-label="${k === 'del' ? T('Delete') : k}">${k === 'del' ? '⌫' : k}</button>` : '<span></span>').join('')}</div>
+      <button class="btn tonal" id="pcancel" style="margin-top:6px">${T('Cancel')}</button></div>`;
+    document.body.appendChild(bg);
+    const dots = bg.querySelectorAll('#dots i'), err = $('#perr', bg);
+    const paint = () => dots.forEach((d, i) => d.classList.toggle('on', i < pin.length));
+    const done = v => { bg.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const fail = m => { err.textContent = T(m); pin = ''; paint(); const box = $('.pop', bg); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); navigator.vibrate?.(60); };
+    const complete = async () => {
+      if (setNew) {
+        if (first == null) { first = pin; pin = ''; paint(); $('#pinh', bg).textContent = head(); err.innerHTML = '&nbsp;'; }
+        else if (first === pin) done(pin);
+        else { first = null; $('#pinh', bg).textContent = head(); fail("PINs don't match. Try again."); }
+      } else if (await check(pin)) done(true); else fail('Wrong PIN');
+    };
+    const press = k => { if (k === 'del') { pin = pin.slice(0, -1); paint(); return; } if (pin.length < 4) { pin += k; paint(); if (pin.length === 4) setTimeout(complete, 120); } };
+    bg.querySelectorAll('.pad button').forEach(b => b.onclick = () => press(b.dataset.k));
+    const onKey = e => { if (/^\d$/.test(e.key)) press(e.key); else if (e.key === 'Backspace') press('del'); else if (e.key === 'Escape') done(null); };
+    document.addEventListener('keydown', onKey);
+    $('#pcancel', bg).onclick = () => done(null);
+  });
+}
+const verifyPin = (type, id, title) => pinPad({ title, check: async p => (await pinHash(type, id, p)) === libEntry(type, id)?.pin });
+async function unlockThen(type, id, title, fn) {
+  const e = libEntry(type, id);
+  if (!e?.pin || unlocked.has(lockKey(type, id))) return fn();
+  if (await verifyPin(type, id, title)) { unlocked.add(lockKey(type, id)); fn(); }
+}
+/** Locked titles show this instead of their page until the PIN is entered. */
+async function lockGate(type, id, token) {
+  const e = libEntry(type, id);
+  if (!e?.pin || unlocked.has(lockKey(type, id))) return false;
+  view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="${T('Back')}">${ic('back')}</a>
+    <div class="msg" style="min-height:70dvh;align-content:center"><div class="pin-ic big">${ic('lock')}</div><h3>${T('This title is locked')}</h3><p>${T('Enter the 4-digit PIN to open it')}</p>
+    <button class="btn acc" id="gpin">${T('Enter PIN')}</button></div>`;
+  const ask = async () => { if (await verifyPin(type, id, e.title)) { unlocked.add(lockKey(type, id)); if (token === routeToken) route(); } };
+  $('#gpin').onclick = ask; ask();
+  return true;
+}
+function playEntry(e, fromStart) {
+  if (fromStart) updateLib(e.type, e.id, cur => Object.assign(cur, { pos: 0 }));
+  if (e.url && !e.url.startsWith('blob:')) startPlayer({ url: e.url, title: e.title, subtitle: e.season != null ? `S${e.season} • E${e.episode}` : '', type: e.type, id: e.id, imdb: e.imdb, season: e.season, episode: e.episode, poster: e.poster, backdrop: e.backdrop, addon: e.addon });
+  else location.hash = `#/streams/${e.type}/${e.id}/${e.season ?? '-'}/${e.episode ?? '-'}`;
+}
+function openPosterMenu(p) {
+  if (document.querySelector('.pop-bg')) return;
+  const type = p.dataset.type, id = +p.dataset.id, title = p.dataset.title, poster = p.dataset.poster, cont = p.dataset.cont === '1';
+  const e = libEntry(type, id);
+  const header = `<div class="pop-head">${poster ? `<img src="${IMG}w154${poster}" alt="">` : '<span class="ph"></span>'}<div><b>${esc(title)}</b><small class="dim">${esc(p.dataset.year || '')}</small></div></div>`;
+  const base = cur => cur || { type, id, title, poster, pos: 0, dur: 0 };
+  let opts;
+  if (cont && e) {
+    opts = [
+      { icon: 'play', t: 'Continue watching', s: e.season != null ? `S${e.season} • E${e.episode}` : '', fn: () => unlockThen(type, id, title, () => playEntry(libEntry(type, id), false)) },
+      { icon: 'replay', t: 'Play from beginning', fn: () => unlockThen(type, id, title, () => playEntry(libEntry(type, id), true)) },
+      { icon: 'remove', t: 'Remove from Continue Watching', fn: () => unlockThen(type, id, title, () => {
+        updateLib(type, id, cur => { const n = Object.assign(cur, { pos: 0, dur: 0 }); return n.watch || n.watched || n.pin ? n : null; });
+        document.querySelectorAll(`.poster[data-cont="1"][data-k="${type}-${id}"]`).forEach(x => { const r = x.parentElement; x.remove(); if (r && !r.querySelector('.poster')) { r.previousElementSibling?.remove(); r.remove(); } });
+        toast('Removed from Continue Watching');
+      }) },
+      e.pin
+        ? { icon: 'unlock', t: 'Unlock this title', fn: async () => { if (await verifyPin(type, id, title)) { updateLib(type, id, cur => { delete cur.pin; return cur; }); unlocked.delete(lockKey(type, id)); refreshBadges(type, id); toast('Title unlocked'); } } }
+        : { icon: 'lock', t: 'Lock this title', s: 'Needs your 4-digit PIN to open', fn: async () => { const pin = await pinPad({ title, setNew: true }); if (!pin) return; const h = await pinHash(type, id, pin); updateLib(type, id, cur => Object.assign(base(cur), { pin: h })); refreshBadges(type, id); toast('Title locked'); } },
+    ];
+  } else {
+    const inLib = !!(e && e.watch), watched = !!(e && e.watched);
+    opts = [
+      { icon: inLib ? 'bookmark' : 'bookmarkO', t: inLib ? 'Remove from Library' : 'Add to Library', fn: () => { updateLib(type, id, cur => Object.assign(base(cur), { watch: !inLib })); toast(inLib ? 'Removed from Library' : 'Added to Library'); } },
+      { icon: 'checkC', t: watched ? 'Mark as unwatched' : 'Mark as watched', fn: () => { updateLib(type, id, cur => Object.assign(base(cur), { watched: !watched })); refreshBadges(type, id); toast(watched ? 'Marked as unwatched' : 'Marked as watched'); } },
+    ];
+  }
+  popup(header, opts);
+}
+// Touch & hold on any poster (iPhone / Android), right-click on desktop
+let lpTimer = null, lpFired = false, lpXY = null;
+document.addEventListener('touchstart', e => {
+  const p = e.target.closest('.poster'); if (!p) return;
+  lpFired = false; const t = e.touches[0]; lpXY = [t.clientX, t.clientY];
+  clearTimeout(lpTimer); lpTimer = setTimeout(() => { lpFired = true; navigator.vibrate?.(15); p.classList.add('pressed'); setTimeout(() => p.classList.remove('pressed'), 250); openPosterMenu(p); }, 480);
+}, { passive: true });
+document.addEventListener('touchmove', e => { if (!lpXY) return; const t = e.touches[0]; if (Math.hypot(t.clientX - lpXY[0], t.clientY - lpXY[1]) > 10) clearTimeout(lpTimer); }, { passive: true });
+['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, () => clearTimeout(lpTimer), { passive: true }));
+document.addEventListener('click', e => { if (lpFired && e.target.closest('.poster')) { e.preventDefault(); e.stopPropagation(); lpFired = false; } }, true);
+document.addEventListener('contextmenu', e => { const p = e.target.closest('.poster'); if (p) { e.preventDefault(); openPosterMenu(p); } });
+
 // ============================================================================ settings
 function settingsView() {
   const sw = (id, on) => `<button class="switch ${on ? 'on' : ''}" id="${id}" role="switch" aria-checked="${!!on}"></button>`;
   const modeChips = (id, val) => `<div class="chips" style="padding:8px 0 0">${['off', 'button', 'auto'].map(m => `<button class="chip sm ${val === m ? 'on' : ''}" data-mode="${id}:${m}">${{ off: 'Off', button: 'Button', auto: 'Auto' }[m]}</button>`).join('')}</div>`;
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
-  view.innerHTML = `<h1 class="page-title gutter">Settings</h1><div class="gutter">
-    ${standalone ? '' : `<div class="set-h">${ic('phone')}Install on iPhone</div><div class="card"><div class="set-row"><div><b>Add Lumio to your Home Screen</b><small>In Safari, tap the Share button, then “Add to Home Screen”. Lumio then opens full-screen like an app.</small></div></div></div>`}
-    <div class="set-h">${ic('palette')}Appearance</div>
-    <div class="card"><div class="set-row" style="display:block"><b>Theme colour</b><small class="dim">Buttons, highlights, the navigation pill and progress bars</small>
+  view.innerHTML = `<h1 class="page-title gutter">${T("Settings")}</h1><div class="gutter">
+    <div class="set-h">${ic('lang')}${T('Language')}</div>
+    <div class="card"><div class="set-row" style="display:block"><b>${T('App language')}</b><small>${T('Movie and show titles always stay in English')}</small>
+      <div class="chips" style="padding:10px 0 0"><button class="chip ${S.lang !== 'ar' ? 'on' : ''}" data-lang="en">English</button><button class="chip ${S.lang === 'ar' ? 'on' : ''}" data-lang="ar">العربية</button></div></div></div>
+    ${standalone ? '' : `<div class="set-h">${ic('phone')}${T("Install on iPhone")}</div><div class="card"><div class="set-row"><div><b>${T("Add Lumio to your Home Screen")}</b><small>${T("In Safari, tap the Share button, then “Add to Home Screen”. Lumio then opens full-screen like an app.")}</small></div></div></div>`}
+    <div class="set-h">${ic('palette')}${T("Appearance")}</div>
+    <div class="card"><div class="set-row" style="display:block"><b>${T("Theme colour")}</b><small class="dim">${T("Buttons, highlights, the navigation pill and progress bars")}</small>
       <div class="colors" style="padding-top:14px">${ACCENTS.map(([k, n, c]) => `<button class="dot ${S.accent === k ? 'on' : ''}" data-acc="${k}"><i style="background:${c}">${ic('check')}</i>${n}</button>`).join('')}
-        <button class="dot custom ${S.accent === 'custom' ? 'on' : ''}" data-acc="custom"><i><span style="background:${S.customAccent}">${ic('check')}</span></i>Custom</button></div>
+        <button class="dot custom ${S.accent === 'custom' ? 'on' : ''}" data-acc="custom"><i><span style="background:${S.customAccent}">${ic('check')}</span></i>${T("Custom")}</button></div>
       ${S.accent === 'custom' ? `<div style="padding-top:14px"><input type="color" id="custc" value="${esc(S.customAccent)}" aria-label="Custom colour"></div>` : ''}</div></div>
-    <div class="card"><div class="set-row"><div><b>AMOLED black</b><small>Use pure black backgrounds for OLED screens</small></div>${sw('amoled', S.amoled)}</div></div>
+    <div class="card"><div class="set-row"><div><b>${T("AMOLED black")}</b><small>${T("Use pure black backgrounds for OLED screens")}</small></div>${sw('amoled', S.amoled)}</div></div>
 
-    <div class="set-h">${ic('ffwd')}Skipping</div>
+    <div class="set-h">${ic('ffwd')}${T("Skipping")}</div>
     <div class="card">
-      <div class="set-row" style="display:block"><b>Skip intros</b><small>Opening titles and theme songs</small>${modeChips('skipIntro', S.skipIntro)}</div>
-      <div class="set-row" style="display:block"><b>Skip recaps</b><small>“Previously on…” at the start of episodes</small>${modeChips('skipRecap', S.skipRecap)}</div>
-      <div class="set-row" style="display:block"><b>Skip credits</b><small>Shows “Next Episode” on series</small>${modeChips('skipCredits', S.skipCredits)}</div>
-      <div class="set-row"><div><b>Auto-skip nudity scenes</b><small>Skips scenes in filter files you import, and scenes you mark yourself in the player under Scenes</small></div>${sw('skipNudity', S.skipNudity)}</div>
+      <div class="set-row" style="display:block"><b>${T("Skip intros")}</b><small>${T("Opening titles and theme songs")}</small>${modeChips('skipIntro', S.skipIntro)}</div>
+      <div class="set-row" style="display:block"><b>${T("Skip recaps")}</b><small>“Previously on…” at the start of episodes</small>${modeChips('skipRecap', S.skipRecap)}</div>
+      <div class="set-row" style="display:block"><b>${T("Skip credits")}</b><small>Shows “Next Episode” on series</small>${modeChips('skipCredits', S.skipCredits)}</div>
+      <div class="set-row"><div><b>${T("Auto-skip nudity scenes")}</b><small>${T("Skips scenes in filter files you import, and scenes you mark yourself in the player under Scenes")}</small></div>${sw('skipNudity', S.skipNudity)}</div>
     </div>
 
-    <div class="set-h">${ic('playC')}Player</div>
+    <div class="set-h">${ic('playC')}${T("Player")}</div>
     <div class="card">
-      <div class="set-row"><div><b>Auto-play next episode</b></div>${sw('autoNext', S.autoNext)}</div>
-      <div class="set-row" style="display:block"><b>Subtitle size: <span id="ssv">${Math.round(S.subScale * 100)}%</span></b><input type="range" id="subScale" min="0.6" max="2" step="0.1" value="${S.subScale}"></div>
-      <div class="set-row" style="display:block"><b>Preferred subtitle language</b><small>ISO code, e.g. en, ar</small><input class="field" id="subLang" style="margin-top:8px" maxlength="3" value="${esc(S.subLang)}"></div>
+      <div class="set-row"><div><b>${T("Auto-play next episode")}</b></div>${sw('autoNext', S.autoNext)}</div>
+      <div class="set-row" style="display:block"><b>${T('Subtitle size')}: <span id="ssv">${Math.round(S.subScale * 100)}%</span></b><input type="range" id="subScale" min="0.6" max="2" step="0.1" value="${S.subScale}"></div>
+      <div class="set-row" style="display:block"><b>${T("Preferred subtitle language")}</b><small>${T("ISO code, e.g. en, ar")}</small><input class="field" id="subLang" style="margin-top:8px" maxlength="3" value="${esc(S.subLang)}"></div>
     </div>
 
-    <div class="set-h">${ic('movie')}Catalog</div>
+    <div class="set-h">${ic('movie')}${T("Catalog")}</div>
     <div class="card">
-      <div class="set-row" style="display:block"><b>Streaming region</b><small>Which country's Netflix, Disney+, Prime Video… catalogs to show (US, KW, SA, AE, GB…)</small><input class="field" id="region" style="margin-top:8px" maxlength="2" value="${esc(S.region)}"></div>
-      <div class="set-row" style="display:block"><b>TMDB API key</b><small>${S.tmdbKey ? 'Using your own key. Clear it to use the built-in key.' : 'Built-in key is active. Paste your own only to override it.'}</small><input class="field" id="tmdbKey" style="margin-top:8px" type="password" autocomplete="off" value="${esc(S.tmdbKey)}"></div>
+      <div class="set-row" style="display:block"><b>${T("Streaming region")}</b><small>Which country's Netflix, Disney+, Prime Video… catalogs to show (US, KW, SA, AE, GB…)</small><input class="field" id="region" style="margin-top:8px" maxlength="2" value="${esc(S.region)}"></div>
+      <div class="set-row" style="display:block"><b>${T("TMDB API key")}</b><small>${S.tmdbKey ? 'Using your own key. Clear it to use the built-in key.' : 'Built-in key is active. Paste your own only to override it.'}</small><input class="field" id="tmdbKey" style="margin-top:8px" type="password" autocomplete="off" value="${esc(S.tmdbKey)}"></div>
     </div>
 
-    <div class="set-h">${ic('ext')}Stream addons</div>
-    <div class="card"><form class="set-row" style="display:grid;gap:10px" id="addf"><small style="margin:0">Paste a Stremio-compatible addon manifest URL (…/manifest.json). Only install sources you have the right to stream.</small>
-      <input class="field" id="addu" type="url" placeholder="https://…/manifest.json" autocomplete="off"><button class="btn acc" type="submit" style="justify-self:start">Install addon</button></form></div>
-    <div class="card" id="addons">${S.addons.map((a, i) => `<div class="set-row"><div><b>${esc(a.name)}</b><small>${a.builtIn ? 'Built-in • ' : ''}${esc((a.resources || []).join(', ') || addonBase(a))}</small></div><button class="icon-btn" data-del="${i}" aria-label="Remove ${esc(a.name)}" style="background:none">${ic('del')}</button></div>`).join('') || '<div class="set-row"><small>No addons installed</small></div>'}</div>
+    <div class="set-h">${ic('ext')}${T("Stream addons")}</div>
+    <div class="card"><form class="set-row" style="display:grid;gap:10px" id="addf"><small style="margin:0">${T("Paste a Stremio-compatible addon manifest URL (…/manifest.json). Only install sources you have the right to stream.")}</small>
+      <input class="field" id="addu" type="url" placeholder="https://…/manifest.json" autocomplete="off"><button class="btn acc" type="submit" style="justify-self:start">${T("Install addon")}</button></form></div>
+    <div class="card" id="addons">${S.addons.map((a, i) => `<div class="set-row"><div><b>${esc(a.name)}</b><small>${a.builtIn ? T('Built-in • ') : ''}${esc((a.resources || []).join(', ') || addonBase(a))}</small></div><button class="icon-btn" data-del="${i}" aria-label="Remove ${esc(a.name)}" style="background:none">${ic('del')}</button></div>`).join('') || `<div class="set-row"><small>${T("No addons installed")}</small></div>`}</div>
     <p class="dim" style="font-size:12px;padding:24px 0">Lumio web • works best in Safari on iPhone. HDR & Dolby Vision play natively on supported iPhones for HLS/MP4 streams.</p>
   </div>`;
+  view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
   const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
   toggle('amoled', 'amoled'); toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
   view.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => { S.accent = b.dataset.acc; saveSettings(); settingsView(); });
@@ -874,6 +1011,6 @@ function settingsView() {
 }
 
 // ============================================================================ boot
-applyTheme();
+applyTheme(); applyLang();
 if (location.hash === '#/play') history.replaceState(null, '', '#/home');
 route();
