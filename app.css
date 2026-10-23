@@ -401,7 +401,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .wbox { position: relative; width: min(420px, 100%); display: grid; gap: 12px; justify-items: center; text-align: center; padding: 28px 22px; border-radius: 26px;
   background: color-mix(in srgb, var(--s1) 62%, transparent); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
   border: 1px solid rgba(255,255,255,.12); box-shadow: 0 30px 80px rgba(0,0,0,.6); animation: popIn .6s cubic-bezier(.3,1.4,.5,1) both; }
-.wlogo { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), #2A1B6B); box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 45%, transparent); animation: glow 3s ease-in-out infinite; }
+.wlogo { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; background: linear-gradient(135deg, #8A9B35, #2E3A0E); box-shadow: 0 10px 30px rgba(122,139,47,.45); animation: glow 3s ease-in-out infinite; }
 .wlogo svg { width: 40px; height: 40px; }
 .wbox h1 { font-size: 28px; font-weight: 800; }
 .wbox p { margin: 0; max-width: 320px; }
