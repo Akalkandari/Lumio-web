@@ -106,19 +106,32 @@ const ic = (name, extra = '') => `<svg viewBox="0 0 24 24" fill="currentColor" a
 const ic10 = name => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${P[name]}"/><text x="12" y="16.3" text-anchor="middle" font-size="6.5" font-weight="700" fill="currentColor">10</text></svg>`;
 
 // ============================================================================ storage
+// Accounts: every email gets its own space (settings, library, history, locks, filters).
+const raw = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full or blocked */ } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+};
+const normEmail = e => String(e || '').trim().toLowerCase();
+const userId = email => { let h = 0x811c9dc5; for (const c of normEmail(email)) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
+let ACCOUNT = raw.get('lumio.account', null);            // { email, id }
 const store = {
-  get(k, d) { try { const v = localStorage.getItem('lumio.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem('lumio.' + k, JSON.stringify(v)); } catch { /* storage full or blocked */ } },
+  pfx() { return ACCOUNT ? `lumio.u.${ACCOUNT.id}.` : 'lumio.'; },
+  get(k, d) { return raw.get(this.pfx() + k, d); },
+  set(k, v) { raw.set(this.pfx() + k, v); },
 };
 const DEFAULT_SETTINGS = {
   tmdbKey: '', region: 'US', accent: 'violet', customAccent: '#7C5CFF', amoled: false,
   skipIntro: 'button', skipRecap: 'button', skipCredits: 'button', skipNudity: false,
   subLang: 'en', subScale: 1, subBg: true, autoNext: true, addons: null, lang: 'en',
 };
-let S = Object.assign({}, DEFAULT_SETTINGS, store.get('settings', {}));
-if (!S.addons) S.addons = BUILT_IN_ADDONS.slice();
+let S, LIB;
+function loadAccountData() {
+  S = Object.assign({}, DEFAULT_SETTINGS, { lang: raw.get('lumio.deviceLang', 'en') }, store.get('settings', {}));
+  if (!S.addons) S.addons = BUILT_IN_ADDONS.slice();
+  LIB = store.get('library', []);
+}
 const saveSettings = () => { store.set('settings', S); applyTheme(); applyLang(); };
-let LIB = store.get('library', []);
 const saveLib = () => store.set('library', LIB.slice(0, 500));
 const libEntry = (type, id) => LIB.find(e => e.type === type && e.id === id);
 function updateLib(type, id, fn) {
@@ -300,6 +313,7 @@ function renderNav(active) {
 }
 let lastHash = '';
 async function route() {
+  if (!ACCOUNT) { welcomeView(); return; }
   const hash = location.hash || '#/home';
   scrollMemo[lastHash] = scrollY; lastHash = hash;
   const [, name = 'home', ...args] = hash.slice(1).split('/');
@@ -947,12 +961,74 @@ document.addEventListener('touchmove', e => { if (!lpXY) return; const t = e.tou
 document.addEventListener('click', e => { if (lpFired && e.target.closest('.poster')) { e.preventDefault(); e.stopPropagation(); lpFired = false; } }, true);
 document.addEventListener('contextmenu', e => { const p = e.target.closest('.poster'); if (p) { e.preventDefault(); openPosterMenu(p); } });
 
+// ============================================================================ welcome & accounts
+function signIn(email) {
+  email = normEmail(email);
+  const id = userId(email);
+  const accounts = raw.get('lumio.accounts', []);
+  // First person to sign in on this device keeps the data used before accounts existed
+  if (!accounts.length && !raw.get(`lumio.u.${id}.settings`, null)) {
+    for (const k of ['settings', 'library', 'filters']) { const v = raw.get('lumio.' + k, null); if (v != null) { raw.set(`lumio.u.${id}.${k}`, v); raw.del('lumio.' + k); } }
+  }
+  raw.set('lumio.accounts', [{ email, id, last: Date.now() }, ...accounts.filter(a => a.id !== id)].slice(0, 12));
+  ACCOUNT = { email, id }; raw.set('lumio.account', ACCOUNT);
+  unlocked.clear(); cache.clear(); servicesReady = null;
+  loadAccountData(); applyTheme(); applyLang();
+  $('.welcome')?.remove();
+  if (location.hash !== '#/home') location.hash = '#/home'; else route();
+  toast(T('Welcome') + ' ' + email.split('@')[0]);
+}
+function signOut() {
+  closePlayer(true); ACCOUNT = null; raw.del('lumio.account');
+  loadAccountData(); applyTheme(); applyLang();
+  welcomeView();
+}
+const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normEmail(e));
+async function welcomeView() {
+  renderNav(null); view.innerHTML = '';
+  $('.welcome')?.remove();
+  const accounts = raw.get('lumio.accounts', []);
+  const w = document.createElement('div'); w.className = 'welcome';
+  w.innerHTML = `<div class="wall" id="wall"></div><div class="wshade"></div>
+    <div class="wbox">
+      <div class="wlogo">${ic('play')}</div>
+      <h1>${T('Welcome to Lumio')}</h1>
+      <p class="dim">${T('Sign in with your email to keep your own library, history and settings.')}</p>
+      <form id="wf" novalidate>
+        <input class="field" id="we" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="${T('Your email')}" aria-label="${T('Your email')}">
+        <div class="werr" id="werr"></div>
+        <button class="btn acc wgo" type="submit">${T('Continue')}</button>
+      </form>
+      ${accounts.length ? `<div class="wacc"><small class="dim">${T('On this device')}</small>${accounts.map(a => `<button class="chip" data-e="${esc(a.email)}">${esc(a.email)}</button>`).join('')}</div>` : ''}
+      <div class="wlang"><button data-l="en" class="${S.lang !== 'ar' ? 'on' : ''}">English</button><span>·</span><button data-l="ar" class="${S.lang === 'ar' ? 'on' : ''}">العربية</button></div>
+      <small class="dim wnote">${T('No password needed. Your data is saved on this device.')}</small>
+    </div>`;
+  document.body.appendChild(w);
+  const input = $('#we', w), err = $('#werr', w);
+  $('#wf', w).onsubmit = e => {
+    e.preventDefault();
+    if (!validEmail(input.value)) { err.textContent = T('Enter a valid email address'); input.focus(); w.querySelector('.wbox').classList.remove('shake'); void w.offsetWidth; w.querySelector('.wbox').classList.add('shake'); return; }
+    signIn(input.value);
+  };
+  w.querySelectorAll('.wacc .chip').forEach(b => b.onclick = () => signIn(b.dataset.e));
+  w.querySelectorAll('.wlang button').forEach(b => b.onclick = () => { raw.set('lumio.deviceLang', b.dataset.l); S.lang = b.dataset.l; applyLang(); welcomeView(); });
+  // Slowly drifting wall of posters behind the form
+  try {
+    const list = (await api.trending('all', 'week')).filter(x => x.poster_path).slice(0, 18);
+    const wall = $('#wall', w); if (!wall) return;
+    const col = k => `<div class="wcol" style="animation-duration:${38 + k * 7}s;animation-direction:${k % 2 ? 'reverse' : 'normal'}">${[...list, ...list].filter((_, i) => i % 4 === k).map(x => `<img src="${IMG}w342${x.poster_path}" alt="" loading="lazy">`).join('')}</div>`;
+    wall.innerHTML = [0, 1, 2, 3].map(col).join('');
+  } catch { /* offline: plain background */ }
+}
+
 // ============================================================================ settings
 function settingsView() {
   const sw = (id, on) => `<button class="switch ${on ? 'on' : ''}" id="${id}" role="switch" aria-checked="${!!on}"></button>`;
   const modeChips = (id, val) => `<div class="chips" style="padding:8px 0 0">${['off', 'button', 'auto'].map(m => `<button class="chip sm ${val === m ? 'on' : ''}" data-mode="${id}:${m}">${{ off: 'Off', button: 'Button', auto: 'Auto' }[m]}</button>`).join('')}</div>`;
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   view.innerHTML = `<h1 class="page-title gutter">${T("Settings")}</h1><div class="gutter">
+    <div class="set-h">${ic('home')}${T('Account')}</div>
+    <div class="card"><div class="set-row"><div><b>${esc(ACCOUNT?.email || '')}</b><small>${T('Your library, history and settings belong to this email')}</small></div><button class="btn tonal" id="signout" style="height:36px;padding:0 14px">${T('Switch account')}</button></div></div>
     <div class="set-h">${ic('lang')}${T('Language')}</div>
     <div class="card"><div class="set-row" style="display:block"><b>${T('App language')}</b><small>${T('Movie and show titles always stay in English')}</small>
       <div class="chips" style="padding:10px 0 0"><button class="chip ${S.lang !== 'ar' ? 'on' : ''}" data-lang="en">English</button><button class="chip ${S.lang === 'ar' ? 'on' : ''}" data-lang="ar">العربية</button></div></div></div>
@@ -991,6 +1067,7 @@ function settingsView() {
     <div class="card" id="addons">${S.addons.map((a, i) => `<div class="set-row"><div><b>${esc(a.name)}</b><small>${a.builtIn ? T('Built-in • ') : ''}${esc((a.resources || []).join(', ') || addonBase(a))}</small></div><button class="icon-btn" data-del="${i}" aria-label="Remove ${esc(a.name)}" style="background:none">${ic('del')}</button></div>`).join('') || `<div class="set-row"><small>${T("No addons installed")}</small></div>`}</div>
     <p class="dim" style="font-size:12px;padding:24px 0">Lumio web • works best in Safari on iPhone. HDR & Dolby Vision play natively on supported iPhones for HLS/MP4 streams.</p>
   </div>`;
+  $('#signout').onclick = signOut;
   view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
   const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
   toggle('amoled', 'amoled'); toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
@@ -1011,6 +1088,7 @@ function settingsView() {
 }
 
 // ============================================================================ boot
+loadAccountData();
 applyTheme(); applyLang();
 if (location.hash === '#/play') history.replaceState(null, '', '#/home');
-route();
+if (ACCOUNT) route(); else welcomeView();

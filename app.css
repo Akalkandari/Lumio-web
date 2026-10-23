@@ -390,3 +390,29 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .pad button:active { transform: scale(.9); background: var(--accent); }
 .shake { animation: shake .35s; }
 @keyframes shake { 20% { transform: translateX(14px); } 40% { transform: translateX(-12px); } 60% { transform: translateX(8px); } 80% { transform: translateX(-4px); } }
+
+/* ---------------- Welcome / sign-in */
+.welcome { position: fixed; inset: 0; z-index: 300; display: grid; place-items: center; overflow: hidden; background: var(--bg); padding: calc(24px + var(--safe-t)) max(20px, var(--safe-r)) calc(24px + var(--safe-b)) max(20px, var(--safe-l)); }
+.wall { position: absolute; inset: -10%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; transform: rotate(-8deg) scale(1.15); opacity: .55; }
+.wcol { display: grid; gap: 12px; align-content: start; animation: wallUp linear infinite; }
+.wcol img { width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 12px; }
+@keyframes wallUp { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+.wshade { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--bg) 55%, transparent), var(--bg) 75%), linear-gradient(to bottom, transparent, var(--bg) 92%); }
+.wbox { position: relative; width: min(420px, 100%); display: grid; gap: 12px; justify-items: center; text-align: center; padding: 28px 22px; border-radius: 26px;
+  background: color-mix(in srgb, var(--s1) 62%, transparent); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid rgba(255,255,255,.12); box-shadow: 0 30px 80px rgba(0,0,0,.6); animation: popIn .6s cubic-bezier(.3,1.4,.5,1) both; }
+.wlogo { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), #2A1B6B); box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 45%, transparent); animation: glow 3s ease-in-out infinite; }
+.wlogo svg { width: 40px; height: 40px; }
+.wbox h1 { font-size: 28px; font-weight: 800; }
+.wbox p { margin: 0; max-width: 320px; }
+.wbox form { width: 100%; display: grid; gap: 8px; margin-top: 6px; }
+.wbox .field { height: 52px; font-size: 16px; text-align: center; background: color-mix(in srgb, var(--bg) 70%, transparent); }
+.wgo { justify-content: center; height: 50px; border-radius: 25px; font-size: 16px; }
+.werr { min-height: 16px; font-size: 12px; color: #FF6B6B; }
+.wacc { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; padding-top: 4px; }
+.wacc small { width: 100%; }
+.wacc .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.wlang { display: flex; gap: 8px; align-items: center; color: var(--dim); }
+.wlang button { padding: 4px 8px; border-radius: 10px; color: var(--dim); }
+.wlang button.on { color: #fff; background: rgba(255,255,255,.12); }
+.wnote { font-size: 11px; }

@@ -317,5 +317,15 @@ window.LUMIO_AR = {
 "“Previously on…” at the start of episodes": "«في الحلقات السابقة…» في بداية الحلقات",
 "Shows “Next Episode” on series": "يُظهر «الحلقة التالية» في المسلسلات",
 "Lumio web • works best in Safari on iPhone. HDR & Dolby Vision play natively on supported iPhones for HLS/MP4 streams.": "Lumio للويب • يعمل بشكل أفضل في Safari على iPhone. يُشغَّل HDR وDolby Vision مباشرة على أجهزة iPhone المدعومة.",
-"MKV file: Safari may not play it. Use “Open in…” in the player for Infuse or VLC.": "ملف MKV: قد لا يشغّله Safari. استخدم «فتح في…» في المشغّل لـ Infuse أو VLC."
+"MKV file: Safari may not play it. Use “Open in…” in the player for Infuse or VLC.": "ملف MKV: قد لا يشغّله Safari. استخدم «فتح في…» في المشغّل لـ Infuse أو VLC.",
+"Welcome": "مرحبًا",
+"Sign in with your email to keep your own library, history and settings.": "سجّل الدخول ببريدك الإلكتروني لتحتفظ بمكتبتك وسجلّك وإعداداتك الخاصة.",
+"Your email": "بريدك الإلكتروني",
+"Continue": "متابعة",
+"On this device": "على هذا الجهاز",
+"No password needed. Your data is saved on this device.": "لا حاجة لكلمة مرور. تُحفظ بياناتك على هذا الجهاز.",
+"Enter a valid email address": "أدخل بريدًا إلكترونيًا صحيحًا",
+"Account": "الحساب",
+"Switch account": "تبديل الحساب",
+"Your library, history and settings belong to this email": "مكتبتك وسجلّك وإعداداتك مرتبطة بهذا البريد"
 };
