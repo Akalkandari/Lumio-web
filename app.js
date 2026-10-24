@@ -1182,9 +1182,8 @@ async function afterSignIn() {
     if (oldS) { S = Object.assign({}, DEFAULT_SETTINGS, oldS); CD[kS(MAIN)] = JSON.stringify(toApp(S, {})); }
     if (oldL) CD[kL(MAIN)] = JSON.stringify(oldL.map(toEntry));
     if (oldF) { const o = {}; for (const [k, l] of Object.entries(oldF)) o[k] = l.map(x => ({ kind: x.kind, startMs: Math.round(x.start), endMs: Math.round(x.end), source: x.source || '' })); CD[kF(MAIN)] = JSON.stringify(o); }
-    if (!CD[kS(MAIN)]) CD[kS(MAIN)] = JSON.stringify(toApp(DEFAULT_SETTINGS, {}));
-    if (!CD.profiles) saveProfiles(profiles());
-    await cloudPush(true);
+    // Only upload when there is real data to bring over — never a blank starter profile
+    if (oldS || oldL || oldF) { raw.set(cacheKey(), CD); await cloudPush(true); }
   }
   PROFILE_ID = raw.get('lumio.activeProfile.' + SESSION.uid, MAIN);
   if (!profiles().some(p => p.id === PROFILE_ID)) PROFILE_ID = MAIN;
