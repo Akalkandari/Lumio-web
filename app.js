@@ -29,7 +29,7 @@ const SERVICES = [
   ['mgm', 'MGM+', ['mgm+', 'mgm plus'], 34, '#C8A24B', '#3A2C0C', 'flip'],
   ['discovery', 'Discovery+', ['discovery+', 'discovery plus'], 520, '#1A73E8', '#051C40', 'orbit'],
   ['osn', 'OSN+', ['osn+', 'osn plus'], 629, '#E2007A', '#420024', 'heartbeat'],
-].map(([key, name, aliases, id, c1, c2, motion]) => ({ key, name, aliases, ids: String(id), c1, c2, motion, logo: null }));
+].map(([key, name, aliases, id, c1, c2, motion]) => ({ key, name, aliases, ids: String(id), c1, c2, motion, logo: null, home: { shahid: 'SA', osn: 'AE' }[key] || null }));
 const GENRES = [
   ['action', 'Action', 'with_genres=28', 'with_genres=10759', '#FF5A36', '#6B1300'],
   ['adventure', 'Adventure', 'with_genres=12', 'with_genres=10759', '#FFA62B', '#5C3300'],
@@ -394,7 +394,7 @@ const api = {
     const region = S.region || 'US';
     let extra = sort.startsWith('vote_average') ? '&vote_count.gte=300' : '';
     if (sort.startsWith('primary_release_date') || sort.startsWith('first_air_date')) extra += `&${type === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${new Date().toISOString().slice(0, 10)}`;
-    return tmdb(`discover/${type}?sort_by=${sort}&page=${page}&watch_region=${region}&include_adult=false${extra}&${query}`).then(r => typed(r.results, type));
+    return tmdb(`discover/${type}?sort_by=${sort}&page=${page}${query.includes('watch_region=') ? '' : '&watch_region=' + region}&include_adult=false${extra}&${query}`).then(r => typed(r.results, type));
   },
 };
 
@@ -406,11 +406,20 @@ function loadServices() {
     .then(([a, b]) => {
       const all = [...a, ...b];
       if (!all.length) return SERVICES;
-      return SERVICES.map(s => {
-        const m = all.filter(p => s.aliases.includes(String(p.provider_name).toLowerCase()));
-        if (!m.length) return null;
-        return Object.assign({}, s, { ids: [...new Set(m.map(p => p.provider_id))].join('|'), logo: m[0].logo_path });
-      }).filter(Boolean);
+      const match = (s, list) => list.filter(p => s.aliases.includes(String(p.provider_name).trim().toLowerCase()));
+      // Regional services (Shahid, OSN+) are always shown: outside their home region, browse that region's catalog
+      const homes = [...new Set(SERVICES.filter(s => s.home && !match(s, all).length).map(s => s.home))];
+      return Promise.all(homes.map(r => Promise.all(['movie', 'tv'].map(t => tmdb(`watch/providers/${t}?watch_region=${r}`).then(x => x.results || []).catch(() => [])))
+        .then(([x, y]) => [r, [...x, ...y]]))).then(pairs => {
+        const regional = Object.fromEntries(pairs);
+        return SERVICES.map(s => {
+          const m = match(s, all);
+          if (m.length) return Object.assign({}, s, { ids: [...new Set(m.map(p => p.provider_id))].join('|'), logo: m[0].logo_path });
+          if (!s.home) return null;
+          const h = match(s, regional[s.home] || []);
+          return Object.assign({}, s, { ids: h.length ? [...new Set(h.map(p => p.provider_id))].join('|') : s.ids, logo: h[0]?.logo_path || null, region: s.home });
+        }).filter(Boolean);
+      });
     });
   return servicesReady;
 }
@@ -620,7 +629,7 @@ async function catalogView(kind, key, token) {
   if (!info) { location.replace('#/home'); return; }
   if (info.service) {
     const list = await loadServices(); const s = list.find(x => x.key === key) || info.service;
-    const q = `with_watch_providers=${s.ids}&with_watch_monetization_types=flatrate`;
+    const q = `with_watch_providers=${s.ids}&with_watch_monetization_types=flatrate${s.region ? '&watch_region=' + s.region : ''}`;
     Object.assign(info, { service: s, mq: q, tq: q });
   }
   if (token !== routeToken) return;
