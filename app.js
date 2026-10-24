@@ -233,30 +233,96 @@ async function sbToken() {
   if (Date.now() > SESSION.expires - 60000) saveSession(await authCall('token?grant_type=refresh_token', { refresh_token: SESSION.refresh }));
   return SESSION.access;
 }
-async function cloudPull() {
+// Versioned sync (same rules as the phone app): each upload names the cloud version it was based on.
+// If another device wrote in between, the upload is refused → merge both copies → try again. Nothing gets wiped.
+let BASE = null, PULLED = false, syncChain = Promise.resolve();
+const baseKey = () => 'lumio.base.' + (SESSION?.uid || '');
+const pushedKey = () => 'lumio.pushed.' + (SESSION?.uid || '');
+function loadSyncState() { BASE = raw.get(baseKey(), null); lastPushed = raw.get(pushedKey(), ''); PULLED = false; }
+function rememberSynced(at, data) {
+  BASE = at; lastPushed = JSON.stringify(data);
+  raw.set(baseKey(), BASE); raw.set(pushedKey(), lastPushed); raw.set('lumio.lastSync', Date.now());
+}
+const serial = fn => { const p = syncChain.then(fn, fn); syncChain = p.catch(() => {}); return p; };
+function mergeCD(remote, local) {
+  const out = Object.assign({}, remote);
+  for (const [k, lv] of Object.entries(local)) {
+    const rv = remote[k];
+    if (rv == null) { out[k] = lv; continue; }
+    try {
+      if (k === 'profiles') {
+        const r = JSON.parse(rv), l = JSON.parse(lv);
+        out[k] = JSON.stringify(r.concat(l.filter(p => !r.some(x => x.id === p.id))));
+      } else if (k.startsWith('library')) {
+        const m = new Map();
+        for (const e of JSON.parse(rv).concat(JSON.parse(lv))) { const id = e.type + '-' + e.tmdbId, c = m.get(id); if (!c || (e.updatedAt || 0) > (c.updatedAt || 0)) m.set(id, e); }
+        out[k] = JSON.stringify([...m.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 500));
+      } else if (k.startsWith('scene_filters')) {
+        const r = JSON.parse(rv), l = JSON.parse(lv), o = {};
+        for (const key of new Set(Object.keys(r).concat(Object.keys(l)))) {
+          const seen = new Set();
+          o[key] = (r[key] || []).concat(l[key] || []).filter(x => { const id = x.startMs + ':' + x.endMs; if (seen.has(id)) return false; seen.add(id); return true; }).sort((a, b) => a.startMs - b.startMs);
+        }
+        out[k] = JSON.stringify(o);
+      }   // settings: cloud wins
+    } catch { /* keep the cloud's copy */ }
+  }
+  return out;
+}
+async function fetchRow() {
   const t = await sbToken();
-  const r = await fetch(`${SB_URL}/rest/v1/user_data?select=data&user_id=eq.${SESSION.uid}`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + t } });
+  const r = await fetch(`${SB_URL}/rest/v1/user_data?select=data,updated_at&user_id=eq.${SESSION.uid}`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + t }, cache: 'no-store' });
   if (!r.ok) throw new Error('Sync failed');
-  const d = (await r.json())[0]?.data;
-  if (!d || !Object.keys(d).length) return false;
-  CD = {}; for (const [k, v] of Object.entries(d)) CD[k] = typeof v === 'string' ? v : JSON.stringify(v);
-  raw.set(cacheKey(), CD); lastPushed = JSON.stringify(CD); raw.set('lumio.lastSync', Date.now());
+  const row = (await r.json())[0];
+  if (!row) return null;
+  const data = {}; for (const [k, v] of Object.entries(row.data || {})) data[k] = typeof v === 'string' ? v : JSON.stringify(v);
+  return { data, at: row.updated_at };
+}
+async function upload(data, at) {
+  const t = await sbToken();
+  const payload = { data, updated_at: new Date().toISOString() };
+  if (!at) payload.user_id = SESSION.uid;
+  const body = JSON.stringify(payload);
+  const url = at ? `${SB_URL}/rest/v1/user_data?user_id=eq.${SESSION.uid}&updated_at=eq.${encodeURIComponent(at)}&select=updated_at`
+                 : `${SB_URL}/rest/v1/user_data?select=updated_at`;
+  const r = await fetch(url, { method: at ? 'PATCH' : 'POST', keepalive: body.length < 60000,
+    headers: { apikey: SB_KEY, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body });
+  if (r.status === 409) return false;
+  if (!r.ok) throw new Error('Sync failed');
+  const j = await r.json();
+  if (!j.length) return false;           // another device wrote first
+  rememberSynced(j[0].updated_at, data);
   return true;
 }
-async function cloudPush(force) {
-  if (!SESSION) return;
-  const body = JSON.stringify(CD);
-  if (!force && body === lastPushed) return;
-  try {
-    const t = await sbToken();
-    const r = await fetch(`${SB_URL}/rest/v1/user_data?on_conflict=user_id`, {
-      method: 'POST', keepalive: body.length < 60000,
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ user_id: SESSION.uid, data: CD, updated_at: new Date().toISOString() }),
-    });
-    if (r.ok) { lastPushed = body; raw.set('lumio.lastSync', Date.now()); }
-  } catch { /* offline: retried on the next change */ }
+/** Returns true when the account has data (callers then refresh the screen). */
+async function cloudPullNow() {
+  for (let i = 0; i < 4; i++) {
+    const row = await fetchRow();
+    const changed = JSON.stringify(CD) !== lastPushed;
+    PULLED = true;
+    if (!row || !Object.keys(row.data).length) {
+      if (!Object.keys(CD).length) return false;   // nothing anywhere: never upload a blank starter profile
+      if (await upload(CD, row?.at)) return true;
+      continue;
+    }
+    let up = null;
+    if (row.at === BASE) { if (changed) up = CD; }                 // only this browser changed
+    else if (BASE && !changed) CD = row.data;                      // only other devices changed
+    else { CD = mergeCD(row.data, CD); if (JSON.stringify(CD) !== JSON.stringify(row.data)) up = CD; }   // both: combine
+    raw.set(cacheKey(), CD);
+    if (!up) { rememberSynced(row.at, CD); return true; }
+    if (await upload(up, row.at)) return true;
+  }
+  throw new Error('Sync conflict');
 }
+async function cloudPushNow(force) {
+  if (!SESSION) return;
+  if (!PULLED || !BASE) { if (await cloudPullNow()) loadProfileData(); return; }   // never upload before seeing the cloud
+  if (!force && JSON.stringify(CD) === lastPushed) return;
+  if (!(await upload(CD, BASE))) { await cloudPullNow(); loadProfileData(); }
+}
+const cloudPull = () => serial(cloudPullNow);
+const cloudPush = force => serial(() => cloudPushNow(force)).catch(() => { /* offline: retried on the next change */ });
 const libEntry = (type, id) => LIB.find(e => e.type === type && e.id === id);
 function updateLib(type, id, fn) {
   const i = LIB.findIndex(e => e.type === type && e.id === id);
@@ -1170,6 +1236,7 @@ const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normEmail(e));
 /** Load the account: cloud first; if the cloud is empty, upload what this browser had before. */
 async function afterSignIn() {
   CD = raw.get(cacheKey(), {}) || {};
+  loadSyncState();
   let found = false;
   try { found = await cloudPull(); } catch { /* offline: use cached copy */ }
   if (!found && !Object.keys(CD).length) {
@@ -1195,7 +1262,7 @@ async function signOut() {
   closePlayer(true);
   await cloudPush(true);
   try { await authCall('logout', {}, SESSION?.access); } catch { /* ignore */ }
-  raw.del(cacheKey()); raw.del('lumio.session'); SESSION = null; CD = {}; PROFILE_ID = MAIN; PROFILE_CHOSEN = false;
+  raw.del(cacheKey()); raw.del(baseKey()); raw.del(pushedKey()); raw.del('lumio.session'); SESSION = null; CD = {}; PROFILE_ID = MAIN; PROFILE_CHOSEN = false;
   unlocked.clear(); loadProfileData(); applyTheme(); applyLang();
   loginView();
 }
@@ -1345,7 +1412,7 @@ function settingsView() {
   </div>`;
   $('#signout').onclick = signOut;
   $('#pswitch').onclick = () => { PROFILE_CHOSEN = false; profilesView(); };
-  $('#psync').onclick = async () => { toast('Syncing…'); try { await cloudPush(true); await cloudPull(); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); settingsView(); } catch { toast('Network error'); } };
+  $('#psync').onclick = async () => { toast('Syncing…'); try { await cloudPull(); await cloudPush(true); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); settingsView(); } catch { toast('Network error'); } };
   view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
   const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
   toggle('amoled', 'amoled'); toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
@@ -1367,6 +1434,7 @@ function settingsView() {
 
 // ============================================================================ boot
 CD = raw.get(cacheKey(), {}) || {};
+if (SESSION) loadSyncState();
 if (SESSION) { PROFILE_ID = raw.get('lumio.activeProfile.' + SESSION.uid, MAIN); if (!profiles().some(p => p.id === PROFILE_ID)) PROFILE_ID = MAIN; }
 loadProfileData();
 applyTheme(); applyLang();
