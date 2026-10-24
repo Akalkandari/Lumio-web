@@ -2,7 +2,7 @@
    only canvases that are on screen are drawn (cheap on battery). */
 (function () {
   const TAU = Math.PI * 2;
-  const PERIOD = { thriller: 1600, crime: 1200, music: 1400, reality: 1500, documentary: 5000, history: 5000, western: 5000, drama: 4200, war: 4200 };
+  const PERIOD = { sp_football: 2400, sp_basketball: 2400, sp_nfl: 2400, sp_racing: 1400, sp_hockey: 2600, sp_baseball: 2400, sp_mma: 1600, sp_tennis: 2200, thriller: 1600, crime: 1200, music: 1400, reality: 1500, documentary: 5000, history: 5000, western: 5000, drama: 4200, war: 4200 };
   const items = new Set();
   const visible = new WeakSet();
   const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? visible.add(e.target) : visible.delete(e.target))) : null;
@@ -164,6 +164,75 @@
       const m = 6, l = h * .2;
       [[m, m, 1, 1], [w - m, m, -1, 1], [m, h - m, 1, -1], [w - m, h - m, -1, -1]].forEach(([x, y, dx, dy]) => { line(c, x, y, x + l * dx, y, 'rgba(255,255,255,.8)', 2); line(c, x, y, x, y + l * dy, 'rgba(255,255,255,.8)', 2); });
       if (v < .6) circle(c, w - m - h * .25, m + h * .2, h * .07, '#FF3B30');
+    },
+    // ---- Live Sports (original drawings)
+    sp_football(c, w, h, v) {
+      for (let i = 0; i < 6; i += 2) { c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(w * i / 6, 0, w / 6, h); }
+      ring(c, w * .5, h * .55, h * .32, 'rgba(255,255,255,.12)', 1.5); line(c, w * .5, 0, w * .5, h, 'rgba(255,255,255,.12)', 1.5);
+      const x = w * (.1 + .8 * v), b = abs(sin(v * TAU * 2)), r = h * .12, y = h * .82 - b * h * .45;
+      oval(c, x - r, h * .86, r * 2, r * .5, `rgba(0,0,0,${.25 * (1 - b * .6)})`);
+      c.save(); c.translate(x, y); c.rotate(v * TAU * 2); circle(c, 0, 0, r, '#fff'); circle(c, 0, 0, r * .38, '#111');
+      for (let k = 0; k < 5; k++) { const a = k * TAU / 5; circle(c, cos(a) * r * .8, sin(a) * r * .8, r * .2, '#111'); } c.restore();
+    },
+    sp_basketball(c, w, h, v) {
+      const rx = w * .78, ry = h * .38; c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(rx + h * .12, ry - h * .3, 3, h * .38);
+      const sway = sin(v * TAU * 2) * (v > .55 && v < .8 ? 4 : .6);
+      for (let k = 0; k <= 4; k++) { const nx = rx - h * .12 + k * h * .06; line(c, nx, ry, rx + sway + (nx - rx) * .6, ry + h * .2, 'rgba(255,255,255,.35)', 1.5); }
+      line(c, rx - h * .13, ry, rx + h * .13, ry, '#FF6A00', 4);
+      const p = Math.min(v / .7, 1), x = w * .12 + (rx - w * .12) * p;
+      const y = v < .7 ? h * .85 - sin(p * Math.PI) * h * .75 + (ry - h * .85) * p * p * .6 : ry + (v - .7) / .3 * h * .55, r = h * .11;
+      c.save(); c.translate(x, y); c.rotate(v * TAU * 1.5); circle(c, 0, 0, r, '#FF7A1A'); line(c, -r, 0, r, 0, '#5A2600', 1.6); line(c, 0, -r, 0, r, '#5A2600', 1.6); c.restore();
+    },
+    sp_nfl(c, w, h, v) {
+      for (let k = 0; k <= 6; k++) { const lx = (((k / 6 - v) % 1) + 1) % 1 * w; line(c, lx, 0, lx, h, 'rgba(255,255,255,.12)', 2); }
+      const x = w * (.08 + .84 * v), y = h * .7 - sin(v * Math.PI) * h * .45;
+      for (let k = 0; k < 3; k++) line(c, x - h * (.2 + k * .08), y + (k - 1) * 4, x - h * (.4 + k * .12), y + (k - 1) * 5, `rgba(255,255,255,${.25 - k * .07})`, 2);
+      const bw = h * .36, bh = h * .21; c.save(); c.translate(x, y); c.rotate((-25 + v * 50) * Math.PI / 180);
+      oval(c, -bw / 2, -bh / 2, bw, bh, '#8B4513'); line(c, -bw * .18, 0, bw * .18, 0, '#fff', 2);
+      for (let k = -2; k <= 2; k++) line(c, k * bw * .07, -3, k * bw * .07, 3, '#fff', 1.6); c.restore();
+    },
+    sp_racing(c, w, h, v) {
+      const sq = h * .09; let i = 0;
+      for (let x = -sq * 2 + (v * sq * 2) % (sq * 2); x < w + sq; x += sq, i++) { c.fillStyle = 'rgba(255,255,255,.22)'; c.fillRect(x, h - sq * (i % 2 ? 1 : 2), sq, sq); }
+      for (let k = 0; k < 6; k++) { const ly = h * (.15 + k * .11), lx = w - ((v * 2.5 + k * .17) % 1) * w * 1.4; line(c, lx, ly, lx + w * .22, ly, 'rgba(255,255,255,.18)', 2); }
+      const X = w * .32 + sin(v * TAU) * w * .06, Y = h * .52 + sin(v * TAU * 8) * 1.2, cw = h * .85, ch = h * .17;
+      c.beginPath(); c.moveTo(X, Y + ch); c.lineTo(X + cw, Y + ch); c.lineTo(X + cw * .95, Y + ch * .35); c.lineTo(X + cw * .6, Y + ch * .2);
+      c.lineTo(X + cw * .45, Y - ch * .35); c.lineTo(X + cw * .3, Y - ch * .35); c.lineTo(X + cw * .22, Y + ch * .2); c.lineTo(X, Y + ch * .3); c.closePath(); c.fillStyle = '#FF2D2D'; c.fill();
+      c.fillStyle = '#fff'; c.fillRect(X - cw * .04, Y - ch * .1, cw * .06, ch * .5);
+      [.2, .8].forEach(f => { const cx = X + cw * f, cy = Y + ch * 1.05; circle(c, cx, cy, ch * .55, '#111'); const a = v * TAU * 6; line(c, cx - cos(a) * ch * .35, cy - sin(a) * ch * .35, cx + cos(a) * ch * .35, cy + sin(a) * ch * .35, '#888', 2); });
+    },
+    sp_hockey(c, w, h, v) {
+      const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,.12)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      line(c, w * .5, 0, w * .5, h, 'rgba(255,77,77,.4)', 2.5); line(c, w * .25, 0, w * .25, h, 'rgba(77,124,255,.35)', 2); line(c, w * .75, 0, w * .75, h, 'rgba(77,124,255,.35)', 2);
+      const p = (sin(v * TAU - Math.PI / 2) + 1) / 2, x = w * (.15 + .7 * p), y = h * .62, dir = cos(v * TAU - Math.PI / 2) > 0 ? 1 : -1;
+      for (let k = 0; k < 5; k++) oval(c, x - dir * k * h * .07 - h * .08, y - h * .03, h * .16, h * .06, `rgba(0,0,0,${.12 - k * .02})`);
+      oval(c, x - h * .09, y - h * .04, h * .18, h * .08, '#0d0d0d'); oval(c, x - h * .09, y - h * .055, h * .18, h * .07, '#333');
+    },
+    sp_baseball(c, w, h, v) {
+      c.beginPath(); c.moveTo(w * .5, h * .2); c.lineTo(w * .7, h * .55); c.lineTo(w * .5, h * .9); c.lineTo(w * .3, h * .55); c.closePath(); c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.stroke();
+      const bx = w * .82, by = h * .62, sw = Math.min(Math.max((v - .42) / .18, 0), 1);
+      c.save(); c.translate(bx, by); c.rotate((-70 + sw * 140) * Math.PI / 180); line(c, 0, 0, -h * .55, 0, '#C08A4A', 7); line(c, 0, 0, -h * .12, 0, '#6B4423', 4); c.restore();
+      let x, y; if (v < .5) { const p = v / .5; x = w * .1 + (bx - h * .4 - w * .1) * p; y = h * .55 - sin(p * Math.PI) * h * .08; }
+      else { const p = (v - .5) / .5; x = bx - h * .4 - p * w * .75; y = h * .6 - sin(p * Math.PI * .9) * h * .55; }
+      const r = h * .09; if (v > .48 && v < .56) ring(c, x, y, r * 2.2, 'rgba(255,255,255,.5)', 2);
+      circle(c, x, y, r, '#fff'); c.beginPath(); c.arc(x - r * .6, y, r, -.9, .9); c.strokeStyle = '#E53935'; c.lineWidth = 1.5; c.stroke(); c.beginPath(); c.arc(x + r * .6, y, r, Math.PI - .9, Math.PI + .9); c.stroke();
+    },
+    sp_mma(c, w, h, v) {
+      c.beginPath(); for (let k = 0; k <= 8; k++) { const a = TAU * k / 8 + Math.PI / 8, px = w * .5 + cos(a) * h * .55, py = h * .5 + sin(a) * h * .45; k ? c.lineTo(px, py) : c.moveTo(px, py); }
+      c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.stroke();
+      const L = Math.max(0, sin(v * TAU)), R = Math.max(0, -sin(v * TAU)), r = h * .17;
+      const glove = (x, y, col, f) => { c.fillStyle = col; c.beginPath(); c.roundRect ? c.roundRect(x - r, y - r * .85, r * 2, r * 1.7, r * .8) : c.rect(x - r, y - r * .85, r * 2, r * 1.7); c.fill();
+        c.fillStyle = 'rgba(255,255,255,.85)'; c.fillRect(x + f * r * .55 - r * .12, y - r * .8, r * .24, r * 1.6); };
+      glove(w * .18 + L * w * .22, h * .55, '#E11D1D', -1); glove(w * .82 - R * w * .22, h * .45, '#1D4ED8', 1);
+      const hit = Math.max(L, R); if (hit > .85) { const s = (hit - .85) / .15; for (let k = 0; k < 8; k++) { const a = TAU * k / 8; line(c, w * .5 + cos(a) * r * .5, h * .5 + sin(a) * r * .5, w * .5 + cos(a) * r * (.8 + s), h * .5 + sin(a) * r * (.8 + s), '#FFD43B', 3); } }
+    },
+    sp_tennis(c, w, h, v) {
+      line(c, 0, h * .88, w, h * .88, 'rgba(255,255,255,.18)', 2); line(c, w * .5, h * .5, w * .5, h * .88, 'rgba(255,255,255,.6)', 2);
+      for (let k = 0; k <= 4; k++) line(c, w * .5 - 6, h * (.55 + k * .07), w * .5 + 6, h * (.55 + k * .07), 'rgba(255,255,255,.25)', 1);
+      const p = (v * 2) % 1, right = v < .5, sx = right ? w * .08 : w * .92, ex = right ? w * .92 : w * .08, x = sx + (ex - sx) * p;
+      const y = p < .65 ? h * .5 - sin(p / .65 * Math.PI) * h * .35 + (h * .38) * (p / .65) * (p / .65) : h * .88 - sin((p - .65) / .35 * Math.PI) * h * .4;
+      circle(c, x, y, h * .075, '#D7F542');
+      if (p < .12 || p > .92) { const hx = p < .12 ? sx : ex, r = h * .075; oval(c, hx - r * 1.6, h * .42 - r * 2.2, r * 3.2, r * 4.4, 'rgba(255,255,255,.9)', 2.5); line(c, hx, h * .42 + r * 2.2, hx, h * .42 + r * 4.2, '#333', 4); }
     },
     kids(c, w, h, v) {
       ['#FF6B6B', '#FFD93D', '#6BCB77'].forEach((col, i) => { const hop = abs(sin((v + i * .22) * Math.PI * 2)), r = h * .12; circle(c, w * (.55 + i * .15), h * .85 - r - hop * h * .45, r, col); });

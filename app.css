@@ -508,3 +508,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .person-head .acc-t { color: var(--accent); font-weight: 600; font-size: 13px; margin-top: 6px; }
 .person-head .bio { margin-top: 10px; font-size: 14px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
 .person-head .bio.open { -webkit-line-clamp: unset; }
+
+/* Live Sports */
+.tile.sport .live-b { position: absolute; top: 8px; inset-inline-end: 8px; z-index: 2; background: #E11D1D; color: #fff; font-size: 9px; font-weight: 900; padding: 1px 5px; border-radius: 6px; letter-spacing: .5px; }
+.grid.events { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); padding-top: 14px; }
+.event { text-align: start; display: grid; gap: 4px; }
+.event .ev-img { position: relative; aspect-ratio: 16/10; border-radius: 16px; overflow: hidden; background: var(--s2); display: grid; place-items: center; }
+.event .ev-img img { width: 100%; height: 100%; object-fit: cover; }
+.event .ev-img b { font-size: 28px; color: var(--dim, #A0A0B0); }
+.event .ev-time { position: absolute; top: 8px; inset-inline-start: 8px; background: #E11D1D; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; }
+.event .ev-play { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(transparent, rgba(0,0,0,.5)); }
+.event .ev-play svg { width: 38px; height: 38px; color: #fff; }
+.event .ev-name { font-size: 13px; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.event .ev-desc { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.banner .ttl h1 { font-size: 28px; font-weight: 800; } .banner .ttl p { font-size: 12px; opacity: .8; }

@@ -30,6 +30,18 @@ const SERVICES = [
   ['discovery', 'Discovery+', ['discovery+', 'discovery plus'], 520, '#1A73E8', '#051C40', 'orbit'],
   ['osn', 'OSN+', ['osn+', 'osn plus'], 629, '#E2007A', '#420024', 'heartbeat'],
 ].map(([key, name, aliases, id, c1, c2, motion]) => ({ key, name, aliases, ids: String(id), c1, c2, motion, logo: null, home: { shahid: 'SA', osn: 'AE' }[key] || null }));
+// Live Sports: events come from the sports catalogs of the addons you install (Settings → Stream addons)
+const SPORTS = [
+  ['football', 'Football', '⚽', ['football', 'soccer'], '#22C55E', '#07361C'],
+  ['basketball', 'Basketball', '🏀', ['basketball', 'nba'], '#FF8A1F', '#4A2200'],
+  ['nfl', 'NFL', '🏈', ['american football', 'nfl'], '#3B6FD8', '#0B1E45'],
+  ['racing', 'Racing', '🏎️', ['motorsport', 'racing', 'formula', 'f1', 'nascar', 'motogp', 'indycar'], '#EF4444', '#450A0A'],
+  ['hockey', 'Hockey', '🏒', ['hockey', 'nhl'], '#38BDF8', '#0B2A3D'],
+  ['baseball', 'Baseball', '⚾', ['baseball', 'mlb'], '#6366F1', '#1A1B4B'],
+  ['mma', 'MMA', '🥊', ['mma', 'ufc', 'fight', 'boxing', 'combat'], '#DC2626', '#2B0606'],
+  ['tennis', 'Tennis', '🎾', ['tennis', 'atp', 'wta'], '#C6E33B', '#2E3A06'],
+].map(([key, name, emoji, kw, c1, c2]) => ({ key, name, emoji, kw, c1, c2 }));
+const sportMatch = (sp, text) => { const t = String(text || '').toLowerCase().replace(/[_-]/g, ' '); if (sp.key === 'football' && (t.includes('american') || t.includes('nfl'))) return false; return sp.kw.some(k => t.includes(k)); };
 const GENRES = [
   ['action', 'Action', 'with_genres=28', 'with_genres=10759', '#FF5A36', '#6B1300'],
   ['adventure', 'Adventure', 'with_genres=12', 'with_genres=10759', '#FFA62B', '#5C3300'],
@@ -497,7 +509,9 @@ function discoverSections() {
   ${sectionH('Streaming Services', 'Browse every catalog')}
   <div class="rail gutter" id="services-rail">${servicesHTML(SERVICES.filter(s => s.logo))}</div>
   ${sectionH('Genres', 'Something for every mood')}
-  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>`;
+  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>
+  ${sectionH('Live Sports', 'Matches and channels from your sports addons')}
+  <div class="rail gutter">${SPORTS.map((sp, i) => `<a class="tile genre sport" href="#/catalog/sport/${sp.key}" style="${tileStyle(sp.c1, sp.c2, i)}"><canvas data-scene="sp_${sp.key}" data-i="${i}"></canvas><span class="live-b">${T('LIVE')}</span><span class="lbl"><b>${sp.emoji} ${esc(T(sp.name))}</b></span></a>`).join('')}</div>`;
 }
 const servicesHTML = list => list.map((s, i) => `<a class="tile service" href="#/catalog/service/${s.key}" style="${tileStyle(s.c1, s.c2, i)}">${logoHTML(s, i)}<b>${esc(s.name)}</b></a>`).join('');
 function mountDiscover(root) {
@@ -658,7 +672,48 @@ async function personView(id, token) {
   draw();
 }
 
+async function sportView(key, token) {
+  const sp = SPORTS.find(x => x.key === key); if (!sp) { location.replace('#/home'); return; }
+  view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
+    <div class="banner" style="--c1:${sp.c1};--c2:${sp.c2}"><canvas id="bn-scene"></canvas>
+      <div class="ttl"><span style="font-size:44px">${sp.emoji}</span><div><h1>${esc(T(sp.name))}</h1><p>${esc(T('Live matches and channels from your sports addons'))}</p></div></div></div>
+    <div class="gutter"><div class="grid events" id="ev">${Array.from({ length: 6 }, () => '<div class="sk" style="aspect-ratio:16/10;border-radius:16px"></div>').join('')}</div></div>`;
+  GenreScenes.attach($('#bn-scene'), 'sp_' + sp.key, 0);
+  const addons = S.addons.filter(a => !a.builtIn && supports(a, 'catalog'));
+  const lists = await Promise.all(addons.map(async a => {
+    try {
+      const man = await getJSON(`${addonBase(a)}/manifest.json`);
+      const per = await Promise.all((man.catalogs || []).map(cat => {
+        const ex = cat.extra || [];
+        const genre = (ex.find(e => e.name === 'genre')?.options || []).find(o => sportMatch(sp, o));
+        const byName = sportMatch(sp, `${cat.id} ${cat.name || ''}`) && !ex.some(e => e.isRequired);
+        const url = genre ? `${addonBase(a)}/catalog/${cat.type}/${cat.id}/genre=${encodeURIComponent(genre)}.json` : byName ? `${addonBase(a)}/catalog/${cat.type}/${cat.id}.json` : null;
+        return url ? getJSON(url).then(r => (r.metas || []).map(m => ({ m, type: cat.type, addon: a }))).catch(() => []) : [];
+      }));
+      return per.flat();
+    } catch { return []; }
+  }));
+  if (token !== routeToken) return;
+  const seen = new Set(); const evs = lists.flat().filter(e => { const k = e.type + ':' + e.m.id; if (seen.has(k)) return false; seen.add(k); return true; });
+  const box = $('#ev');
+  if (!evs.length) { box.outerHTML = msg('No live events right now', `Live Sports shows the ${sp.name} catalogs of the sports addons you install. Add one in Settings → Stream addons (paste its manifest link), then come back.`, `<button class="btn acc" onclick="route()">${T('Refresh')}</button>`); return; }
+  box.innerHTML = evs.map((e, i) => { const img = e.m.background || e.m.poster;
+    return `<button class="event" data-i="${i}"><span class="ev-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<b>${esc(e.m.name.slice(0, 2))}</b>`}${e.m.releaseInfo ? `<span class="ev-time">${esc(e.m.releaseInfo)}</span>` : ''}<span class="ev-play">${ic('play')}</span></span>
+      <span class="ev-name">${esc(e.m.name)}</span>${e.m.description ? `<span class="dim ev-desc">${esc(e.m.description)}</span>` : ''}</button>`; }).join('');
+  box.querySelectorAll('.event').forEach(b => b.onclick = async () => {
+    const e = evs[+b.dataset.i]; sheet(e.m.name, [{ icon: 'search', t: 'Finding streams…', keep: true }]);
+    const others = S.addons.filter(a => !a.builtIn && supports(a, 'stream') && addonBase(a) !== addonBase(e.addon));
+    const res = await Promise.all([e.addon, ...others].map(a => getJSON(`${addonBase(a)}/stream/${e.type}/${encodeURIComponent(e.m.id)}.json`)
+      .then(r => (r.streams || []).filter(x => x.url).map(x => ({ a, x }))).catch(() => [])));
+    const streams = res.flat();
+    if (!streams.length) { sheet(e.m.name, [{ icon: 'info', t: 'No streams available for this event yet. Try again closer to the start time.' }]); return; }
+    sheet(e.m.name, streams.map(({ a, x }) => ({ icon: 'play', t: (x.name || a.name).replace(/\n/g, ' '), s: [x.title, x.description].filter(Boolean).join(' · ').slice(0, 120),
+      fn: () => startPlayer({ type: 'live', id: null, local: true, title: e.m.name, subtitle: `${sp.emoji} ${T(sp.name)}`, url: x.url, addon: a.name }) })));
+  });
+}
+
 async function catalogView(kind, key, token) {
+  if (kind === 'sport') return sportView(key, token);
   const info = catalogInfo(kind, key);
   if (!info) { location.replace('#/home'); return; }
   if (info.service) {
