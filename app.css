@@ -498,3 +498,13 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .wbox .field.tvcode { font: 700 26px/1 ui-monospace, Menlo, monospace; letter-spacing: 4px; text-transform: uppercase; }
 .tv-ok { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: #7A8B2F; animation: pop .5s cubic-bezier(.3,1.6,.5,1) both; }
 .tv-ok svg { width: 40px; height: 40px; color: #fff; }
+
+/* Actor page */
+.cast { cursor: pointer; }
+.person-head { display: flex; gap: 18px; align-items: flex-start; padding-top: calc(70px + var(--safe-t)); }
+.person-ph { flex: 0 0 auto; width: 120px; height: 120px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, var(--accent), var(--s2)); }
+.person-ph img { width: 100%; height: 100%; object-fit: cover; }
+.person-head h1 { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.person-head .acc-t { color: var(--accent); font-weight: 600; font-size: 13px; margin-top: 6px; }
+.person-head .bio { margin-top: 10px; font-size: 14px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.person-head .bio.open { -webkit-line-clamp: unset; }

@@ -388,6 +388,7 @@ const api = {
   list: (type, kind, page = 1) => tmdb(`${type}/${kind}?page=${page}`).then(r => typed(r.results, type)),
   search: q => tmdb(`search/multi?query=${encodeURIComponent(q)}&include_adult=false`).then(r => typed(r.results)),
   details: (type, id) => tmdb(`${type}/${id}?append_to_response=external_ids,credits`),
+  person: id => tmdb(`person/${id}?append_to_response=combined_credits`),
   season: (id, n) => tmdb(`tv/${id}/season/${n}`).then(r => r.episodes || []),
   recs: (type, id) => tmdb(`${type}/${id}/recommendations`).then(r => typed(r.results, type)).catch(() => []),
   discover(type, query, sort, page) {
@@ -536,6 +537,7 @@ async function route() {
       case 'settings': settingsView(); break;
       case 'catalog': catalogView(args[0], args[1], token); break;
       case 'details': await detailsView(args[0], +args[1], token); break;
+      case 'person': await personView(+args[0], token); break;
       case 'streams': await streamsView(args[0], +args[1], args[2] === '-' ? null : +args[2], args[3] === '-' ? null : +args[3], token); break;
       case 'play': if (!PLAYER.req) { location.replace('#/home'); return; } break;
       default: location.replace('#/home'); return;
@@ -624,6 +626,38 @@ function catalogInfo(kind, key) {
   if (kind === 'service') { const s = SERVICES.find(x => x.key === key); return s && { title: s.name, sub: `Streaming now on ${s.name}`, service: s, c1: s.c1, c2: s.c2, sortable: true }; }
   const g = GENRES.find(x => x.key === key); return g && { title: g.name, sub: `The best ${g.name.toLowerCase()} titles`, genre: g.key, c1: g.c1, c2: g.c2, mq: g.mq, tq: g.tq, sortable: true };
 }
+/** Actor / director page: photo, bio and every movie & series they're in. */
+async function personView(id, token) {
+  view.innerHTML = `<div class="gutter" style="padding-top:80px">${'<div class="sk" style="height:140px;border-radius:20px"></div>'}</div>`;
+  const p = await api.person(id);
+  if (token !== routeToken) return;
+  const seen = new Map();
+  [...(p.combined_credits?.cast || []), ...(p.combined_credits?.crew || []).filter(c => c.job === 'Director' || c.job === 'Creator')]
+    .filter(c => c.poster_path && (c.media_type === 'movie' || c.media_type === 'tv'))
+    .forEach(c => { const k = c.media_type + '-' + c.id; const role = c.character || c.job || ''; const cur = seen.get(k);
+      if (cur) { if (role && !cur.role.includes(role)) cur.role += ' / ' + role; } else seen.set(k, Object.assign({}, c, { role })); });
+  const all = [...seen.values()].sort((a, b) => (b.popularity * 0.6 + (b.vote_count || 0) / 400) - (a.popularity * 0.6 + (a.vote_count || 0) / 400));
+  const movies = all.filter(c => c.media_type === 'movie').length, shows = all.length - movies;
+  let filter = 'all';
+  const facts = [p.known_for_department === 'Acting' ? T('Actor') : p.known_for_department, p.birthday ? (p.deathday ? `${p.birthday.slice(0, 4)} – ${p.deathday.slice(0, 4)}` : `${T('Born')} ${p.birthday.slice(0, 4)}`) : '', p.place_of_birth].filter(Boolean);
+  const draw = () => {
+    const list = filter === 'all' ? all : all.filter(c => c.media_type === filter);
+    view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
+      <div class="gutter person-head">
+        <div class="person-ph">${p.profile_path ? `<img src="${IMG}h632${p.profile_path}" alt="">` : ''}</div>
+        <div><h1>${esc(p.name)}</h1>${facts.length ? `<p class="dim">${esc(facts.join('  ·  '))}</p>` : ''}
+          <p class="acc-t">${movies} ${T('Movies')}  ·  ${shows} ${T('Shows')}</p>
+          ${p.biography ? `<p class="dim bio">${esc(p.biography)}</p>` : ''}</div>
+      </div>
+      <div class="gutter chips" style="margin:14px 0">${[['all', T('All') + ' ' + all.length], ['movie', T('Movies') + ' ' + movies], ['tv', T('Shows') + ' ' + shows]]
+        .filter(([k]) => k === 'all' || (k === 'movie' ? movies : shows)).map(([k, l]) => `<button class="chip ${filter === k ? 'on' : ''}" data-f="${k}">${l}</button>`).join('')}</div>
+      <div class="gutter"><div class="grid">${list.map((c, i) => posterCard(c, i)).join('')}</div></div>`;
+    view.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; draw(); });
+    view.querySelector('.bio')?.addEventListener('click', e => e.currentTarget.classList.toggle('open'));
+  };
+  draw();
+}
+
 async function catalogView(kind, key, token) {
   const info = catalogInfo(kind, key);
   if (!info) { location.replace('#/home'); return; }
@@ -706,7 +740,7 @@ async function detailsView(type, id, token) {
         </div></div></div>
     <p class="overview gutter">${esc(d.overview)}</p>
     ${type === 'tv' ? `<div class="chips gutter" id="seasons">${seasons.map(s => `<button class="chip ${s.season_number === season ? 'on' : ''}" data-n="${s.season_number}">${esc(s.name)}</button>`).join('')}</div><div class="eps gutter" id="eps"></div>` : ''}
-    ${(d.credits?.cast || []).length ? `<div class="rail-title gutter">${T("Cast")}</div><div class="rail gutter">${d.credits.cast.slice(0, 20).map(c => `<div class="cast">${c.profile_path ? `<img src="${IMG}w185${c.profile_path}" alt="" loading="lazy">` : '<div class="ph"></div>'}<span>${esc(c.name)}</span><span class="dim">${esc(c.character || '')}</span></div>`).join('')}</div>` : ''}`;
+    ${(d.credits?.cast || []).length ? `<div class="rail-title gutter">${T("Cast")}</div><div class="rail gutter">${d.credits.cast.slice(0, 20).map(c => `<div class="cast" role="link" tabindex="0" onclick="location.hash='#/person/${c.id}'">${c.profile_path ? `<img src="${IMG}w185${c.profile_path}" alt="" loading="lazy">` : '<div class="ph"></div>'}<span>${esc(c.name)}</span><span class="dim">${esc(c.character || '')}</span></div>`).join('')}</div>` : ''}`;
   $('#wl').onclick = () => {
     updateLib(type, id, cur => Object.assign(cur || { type, id, title: titleOf(d), poster: d.poster_path, backdrop: d.backdrop_path, pos: 0, dur: 0 }, { watch: !(cur && cur.watch) }));
     const on = libEntry(type, id)?.watch; $('#wl').innerHTML = ic(on ? 'bookmark' : 'bookmarkO'); toast(on ? 'Added to Watchlist' : 'Removed from Watchlist');
