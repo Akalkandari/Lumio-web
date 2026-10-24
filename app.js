@@ -1272,6 +1272,64 @@ async function signOut() {
   loginView();
 }
 
+// ---- Sign in a TV (page opened by scanning the QR code on Lumio TV)
+function tvLinkView() {
+  renderNav(null); document.querySelectorAll('.welcome').forEach(x => x.remove());
+  const clean = v => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  const pretty = c => c.length > 4 ? c.slice(0, 4) + '-' + c.slice(4) : c;
+  let code = clean(new URLSearchParams(location.hash.split('?')[1] || '').get('c'));
+  let creating = false;
+  const w = document.createElement('div'); w.className = 'welcome';
+  w.innerHTML = '<div class="wshade"></div><div class="wbox"></div>';
+  const done = () => {
+    w.querySelector('.wbox').innerHTML = `${lumioLogo()}<div class="tv-ok">${ic('check')}</div>
+      <h1>${T('Your TV is signed in')}</h1><p class="dim">${T('You can close this page. Lumio on your TV opens in a moment.')}</p>
+      <button class="btn wgo olive" id="thome">${T('Open Lumio here')}</button>`;
+    $('#thome', w).onclick = () => { location.hash = '#/home'; location.reload(); };
+  };
+  const draw = () => {
+    w.querySelector('.wbox').innerHTML = `${lumioLogo()}<div class="tv-ic">📺</div>
+      <h1>${T('Sign in your TV')}</h1>
+      <p class="dim">${T('Enter the code shown on your TV')}</p>
+      <form id="tf" novalidate>
+        <input class="field tvcode" id="tc" maxlength="9" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCD-EFGH" aria-label="${T('TV code')}" value="${pretty(code)}">
+        <div class="seg"><button type="button" data-m="0" class="${!creating ? 'on' : ''}">${T('Sign in')}</button><button type="button" data-m="1" class="${creating ? 'on' : ''}">${T('Create account')}</button></div>
+        <input class="field" id="te" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="${T('Email')}" aria-label="${T('Email')}" value="${esc(SESSION?.email || '')}">
+        <div class="pw"><input class="field" id="tp" type="password" autocomplete="${creating ? 'new-password' : 'current-password'}" placeholder="${T('Password')}" aria-label="${T('Password')}"><button type="button" id="tshow" aria-label="Show password">${ic('eyeOff')}</button></div>
+        <div class="werr" id="terr"></div>
+        <button class="btn wgo olive" type="submit" id="tgo">${T('Sign in TV')}</button>
+      </form>`;
+    const err = $('#terr', w), tc = $('#tc', w), email = $('#te', w), pw = $('#tp', w);
+    const shake = m => { err.textContent = T(m); err.style.color = '#FF6B6B'; const box = $('.wbox', w); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); };
+    tc.oninput = () => { code = clean(tc.value); tc.value = pretty(code); };
+    w.querySelectorAll('.seg button').forEach(b => b.onclick = () => { code = clean(tc.value); creating = b.dataset.m === '1'; draw(); });
+    $('#tshow', w).onclick = () => { pw.type = pw.type === 'password' ? 'text' : 'password'; };
+    (code.length === 8 ? (email.value ? pw : email) : tc).focus();
+    $('#tf', w).onsubmit = async e => {
+      e.preventDefault();
+      code = clean(tc.value);
+      if (code.length !== 8) return shake('Enter the 8-character code from your TV');
+      if (!validEmail(email.value)) return shake('Enter a valid email address');
+      if (pw.value.length < 6) return shake('Password must be at least 6 characters');
+      const go = $('#tgo', w); go.disabled = true; go.innerHTML = '<span class="mini-spin"></span>';
+      try {
+        // A fresh sign-in just for the TV (this page's own session is left alone)
+        const j = creating ? await authCall('signup', { email: normEmail(email.value), password: pw.value })
+                           : await authCall('token?grant_type=password', { email: normEmail(email.value), password: pw.value });
+        if (!j.access_token) { err.style.color = '#B5D46B'; err.textContent = T('Account created. Check your email to confirm it, then sign in.'); creating = false; go.disabled = false; go.textContent = T('Sign in TV'); return; }
+        const r = await fetch(`${SB_URL}/rest/v1/rpc/link_tv`, { method: 'POST',
+          headers: { apikey: SB_KEY, Authorization: 'Bearer ' + j.access_token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_code: code, p_refresh: j.refresh_token }) });
+        if (r.status === 404) throw new Error("QR sign-in isn't set up on the server yet");
+        if (!r.ok) throw new Error('Network error');
+        if ((await r.json()) !== true) throw new Error('That code expired or is wrong. Check the TV and try again.');
+        done();
+      } catch (ex) { go.disabled = false; go.textContent = T('Sign in TV'); shake(ex.message || 'Network error'); }
+    };
+  };
+  document.body.appendChild(w); draw();
+}
+
 // ---- Who's watching? / Manage Profiles
 function profilesView(managing = false) {
   renderNav(null); closePop();
@@ -1444,7 +1502,8 @@ if (SESSION) { PROFILE_ID = raw.get('lumio.activeProfile.' + SESSION.uid, MAIN);
 loadProfileData();
 applyTheme(); applyLang();
 if (location.hash === '#/play') history.replaceState(null, '', '#/home');
-if (!SESSION) loginView();
+if (location.hash.startsWith('#/tv')) tvLinkView();   // opened from the QR code on Lumio TV
+else if (!SESSION) loginView();
 else {
   profilesView();   // "Who's watching?" on every launch
   // Fetch the latest from the account (changes made on the phone app or another browser)

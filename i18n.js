@@ -379,5 +379,21 @@ window.LUMIO_AR = {
 "Right": "يمين",
 "Floating": "عائم",
 "For the Fold's inner screen and tablets. Floating gives the content the whole screen and hides while you scroll.": "للشاشة الداخلية لـ Fold والأجهزة اللوحية. الوضع العائم يمنح المحتوى الشاشة كاملة ويختفي أثناء التمرير.",
-"Your library, history and settings belong to this email": "مكتبتك وسجلّك وإعداداتك مرتبطة بهذا البريد"
+"Your library, history and settings belong to this email": "مكتبتك وسجلّك وإعداداتك مرتبطة بهذا البريد",
+"Press back again to exit": "اضغط رجوع مرة أخرى للخروج",
+"Sign in with your phone": "سجّل الدخول بهاتفك",
+"Scan with your phone's camera": "امسح الرمز بكاميرا هاتفك",
+"or go to": "أو افتح",
+"and enter this code": "وأدخل هذا الرمز",
+"or": "أو",
+"QR sign-in isn't set up on the server yet": "تسجيل الدخول برمز QR غير مفعّل على الخادم بعد",
+"Sign in your TV": "سجّل دخول التلفاز",
+"Enter the code shown on your TV": "أدخل الرمز الظاهر على التلفاز",
+"TV code": "رمز التلفاز",
+"Sign in TV": "تسجيل دخول التلفاز",
+"Your TV is signed in": "تم تسجيل دخول التلفاز",
+"You can close this page. Lumio on your TV opens in a moment.": "يمكنك إغلاق هذه الصفحة. سيفتح Lumio على التلفاز خلال لحظات.",
+"Open Lumio here": "افتح Lumio هنا",
+"Enter the 8-character code from your TV": "أدخل الرمز المكوّن من 8 خانات من التلفاز",
+"That code expired or is wrong. Check the TV and try again.": "الرمز منتهي أو غير صحيح. تحقق من التلفاز وحاول مجددًا."
 };

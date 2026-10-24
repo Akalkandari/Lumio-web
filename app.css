@@ -492,3 +492,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .m-float i { animation: float 2.6s ease-in-out infinite; }
 .m-wave i { transform-origin: 70% 90%; animation: avWave 1.3s ease-in-out infinite; }
 @keyframes avWave { 0%, 100% { transform: rotate(-20deg); } 50% { transform: rotate(20deg); } }
+
+/* TV sign-in page */
+.tv-ic { font-size: 40px; margin: 4px 0 -4px; }
+.wbox .field.tvcode { font: 700 26px/1 ui-monospace, Menlo, monospace; letter-spacing: 4px; text-transform: uppercase; }
+.tv-ok { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; background: #7A8B2F; animation: pop .5s cubic-bezier(.3,1.6,.5,1) both; }
+.tv-ok svg { width: 40px; height: 40px; color: #fff; }
