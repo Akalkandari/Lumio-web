@@ -381,6 +381,8 @@ window.LUMIO_AR = {
 "For the Fold's inner screen and tablets. Floating gives the content the whole screen and hides while you scroll.": "للشاشة الداخلية لـ Fold والأجهزة اللوحية. الوضع العائم يمنح المحتوى الشاشة كاملة ويختفي أثناء التمرير.",
 "Your library, history and settings belong to this email": "مكتبتك وسجلّك وإعداداتك مرتبطة بهذا البريد",
 "Press back again to exit": "اضغط رجوع مرة أخرى للخروج",
+"Menu position": "موضع القائمة",
+"Glass menu on the left, on the right, or floating at the top of the screen.": "القائمة الزجاجية على اليسار أو اليمين أو عائمة أعلى الشاشة.",
 "Sign in with your phone": "سجّل الدخول بهاتفك",
 "Scan with your phone's camera": "امسح الرمز بكاميرا هاتفك",
 "or go to": "أو افتح",

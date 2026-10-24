@@ -17,6 +17,7 @@ const SERVICES = [
   ['netflix', 'Netflix', ['netflix'], 8, '#E50914', '#5A0408', 'heartbeat'],
   ['disney', 'Disney+', ['disney plus', 'disney+'], 337, '#1B3FD1', '#0A1A5C', 'orbit'],
   ['prime', 'Prime Video', ['amazon prime video', 'prime video'], 9, '#00A8E1', '#0B2B45', 'shine'],
+  ['shahid', 'Shahid', ['shahid vip', 'shahid'], 1715, '#00C29A', '#003A2E', 'swing'],
   ['apple', 'Apple TV+', ['apple tv plus', 'apple tv+'], 350, '#8E8E93', '#1C1C1E', 'flip'],
   ['max', 'HBO Max', ['max', 'hbo max'], 1899, '#7B2FF7', '#1A0B4A', 'ripple'],
   ['hulu', 'Hulu', ['hulu'], 15, '#1CE783', '#0B4A2C', 'swing'],
@@ -27,7 +28,6 @@ const SERVICES = [
   ['amc', 'AMC+', ['amc+', 'amc plus'], 526, '#00B2FF', '#002B40', 'ripple'],
   ['mgm', 'MGM+', ['mgm+', 'mgm plus'], 34, '#C8A24B', '#3A2C0C', 'flip'],
   ['discovery', 'Discovery+', ['discovery+', 'discovery plus'], 520, '#1A73E8', '#051C40', 'orbit'],
-  ['shahid', 'Shahid', ['shahid vip', 'shahid'], 1715, '#00C29A', '#003A2E', 'swing'],
   ['osn', 'OSN+', ['osn+', 'osn plus'], 629, '#E2007A', '#420024', 'heartbeat'],
 ].map(([key, name, aliases, id, c1, c2, motion]) => ({ key, name, aliases, ids: String(id), c1, c2, motion, logo: null }));
 const GENRES = [
