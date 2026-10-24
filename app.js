@@ -76,6 +76,7 @@ const SORTS = [['popular', 'Popular', 'popularity.desc', 'popularity.desc'], ['t
 // ============================================================================ icons
 const P = {
   home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  sports: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 3.3l1.35-.95c1.82.56 3.37 1.76 4.38 3.34l-.39 1.34-1.35.46L13 6.7V5.3zm-3.35-.95L11 5.3v1.4L7.01 9.49l-1.35-.46-.39-1.34c1.01-1.57 2.56-2.77 4.38-3.34zM7.08 17.11l-1.14.1C4.73 15.81 4 13.99 4 12c0-.12.01-.23.02-.35l1-.73 1.38.48 1.46 4.34-.78 1.37zm7.42 2.48c-.79.26-1.63.41-2.5.41s-1.71-.15-2.5-.41l-.69-1.49.64-1.1h5.11l.64 1.11-.7 1.48zM14.27 15H9.73l-1.35-4.02L12 8.44l3.63 2.54L14.27 15zm3.79 2.21l-1.14-.1-.79-1.37 1.46-4.34 1.39-.47 1 .73c.01.11.02.22.02.34 0 1.99-.73 3.81-1.94 5.21z',
   search: 'M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
   library: 'M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8 12.5v-9l6 4.5-6 4.5z',
   settings: 'M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z',
@@ -522,7 +523,7 @@ function mountDiscover(root) {
 // ============================================================================ router
 const view = $('#view');
 let routeToken = 0;
-const TABS = [['home', 'Home', 'home'], ['search', 'Search', 'search'], ['library', 'Library', 'library'], ['settings', 'Settings', 'settings']];
+const TABS = [['home', 'Home', 'home'], ['sports', 'Live Sports', 'sports'], ['search', 'Search', 'search'], ['library', 'Library', 'library'], ['settings', 'Settings', 'settings']];
 const scrollMemo = {};
 function renderNav(active) {
   const nav = $('#nav');
@@ -546,6 +547,7 @@ async function route() {
   try {
     switch (name) {
       case 'home': await homeView(token); break;
+      case 'sports': await sportsHubView(token); break;
       case 'search': searchView(); break;
       case 'library': libraryView(args[0]); break;
       case 'settings': settingsView(); break;
@@ -672,13 +674,117 @@ async function personView(id, token) {
   draw();
 }
 
-async function sportView(key, token) {
-  const sp = SPORTS.find(x => x.key === key); if (!sp) { location.replace('#/home'); return; }
-  view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
-    <div class="banner" style="--c1:${sp.c1};--c2:${sp.c2}"><canvas id="bn-scene"></canvas>
-      <div class="ttl"><span style="font-size:44px">${sp.emoji}</span><div><h1>${esc(T(sp.name))}</h1><p>${esc(T('Live matches and channels from your sports addons'))}</p></div></div></div>
-    <div class="gutter"><div class="grid events" id="ev">${Array.from({ length: 6 }, () => '<div class="sk" style="aspect-ratio:16/10;border-radius:16px"></div>').join('')}</div></div>`;
-  GenreScenes.attach($('#bn-scene'), 'sp_' + sp.key, 0);
+// ---- Live scores, fixtures & TV channels (ESPN public scoreboard). Streams come only from addons you install.
+const SPORT_LEAGUES = {
+  football: [['soccer/ksa.1', 'Saudi Pro League'], ['soccer/uefa.champions', 'Champions League'], ['soccer/eng.1', 'Premier League'], ['soccer/esp.1', 'LaLiga'],
+    ['soccer/ita.1', 'Serie A'], ['soccer/ger.1', 'Bundesliga'], ['soccer/fra.1', 'Ligue 1'], ['soccer/uefa.europa', 'Europa League']],
+  basketball: [['basketball/nba', 'NBA'], ['basketball/wnba', 'WNBA']], nfl: [['football/nfl', 'NFL']], racing: [['racing/f1', 'Formula 1']],
+  hockey: [['hockey/nhl', 'NHL']], baseball: [['baseball/mlb', 'MLB']], mma: [['mma/ufc', 'UFC']], tennis: [['tennis/atp', 'ATP'], ['tennis/wta', 'WTA']],
+};
+const sbCache = {};
+async function scoreboard(sportKey, [path, league], dates) {
+  const url = `https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard${dates ? '?dates=' + dates : ''}`;
+  const c = sbCache[url]; if (c && Date.now() - c.t < 30000) return c.v;
+  let v = [];
+  try {
+    const d = await getJSON(url, 12000);
+    for (const ev of d.events || []) {
+      const comps = (ev.competitions && ev.competitions.length) ? ev.competitions : (ev.groupings || []).flatMap(g => g.competitions || []);
+      comps.forEach((c, i) => {
+        const st = (c.status || ev.status || {}).type || {};
+        const sides = (c.competitors || []).map(x => { const w = x.team || x.athlete || {};
+          return { name: w.displayName || w.fullName || '', short: w.abbreviation || w.shortDisplayName || w.displayName || '', logo: w.logo || w.flag?.href || w.logos?.[0]?.href || null,
+            score: typeof x.score === 'object' ? x.score?.displayValue : x.score, winner: !!x.winner, home: x.homeAway === 'home' }; })
+          .sort((p, q) => (p.home ? 1 : 0) - (q.home ? 1 : 0));
+        const type = c.type?.abbreviation;
+        v.push({ id: `${ev.id}-${c.id || i}`, sport: sportKey, league, state: st.state || 'pre', detail: st.shortDetail || st.detail || '',
+          title: sportKey === 'racing' ? [ev.name, type].filter(Boolean).join(' · ') : sportKey === 'tennis' ? ev.name : (ev.shortName || ev.name),
+          start: Date.parse(c.date || c.startDate || ev.date) || 0, sides,
+          tv: [...new Set([...(c.broadcasts || []).flatMap(b => b.names || []), ...(c.broadcast ? [c.broadcast] : [])])], venue: c.venue?.fullName || '' });
+      });
+    }
+  } catch { /* offline */ }
+  sbCache[url] = { t: Date.now(), v };
+  return v;
+}
+const ymd = t => new Date(t).toISOString().slice(0, 10).replace(/-/g, '');
+async function leagueOverview(sportKey, lg) {
+  const now = Date.now();
+  const [a, b] = await Promise.all([scoreboard(sportKey, lg), scoreboard(sportKey, lg, `${ymd(now - 2 * 864e5)}-${ymd(now + 7 * 864e5)}`)]);
+  const seen = new Set(); return [...a, ...b].filter(m => !seen.has(m.id) && seen.add(m.id));
+}
+async function liveNow() {
+  const jobs = Object.entries(SPORT_LEAGUES).flatMap(([k, ls]) => ls.slice(0, k === 'football' ? 5 : 1).map(l => scoreboard(k, l)));
+  return (await Promise.all(jobs)).flat();
+}
+function kickoff(t) {
+  if (!t) return '';
+  const d = new Date(t), now = new Date(), time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(now)) / 864e5);
+  if (diff === 0) return `${T('Today')} ${time}`;
+  if (diff === 1) return `${T('Tomorrow')} ${time}`;
+  if (diff === -1) return `${T('Yesterday')} ${time}`;
+  return `${d.toLocaleDateString([], Math.abs(diff) < 6 ? { weekday: 'short' } : { day: 'numeric', month: 'short' })} ${time}`;
+}
+function matchCard(m, i, watch) {
+  const sp = SPORTS.find(x => x.key === m.sport) || SPORTS[0];
+  const status = m.state === 'in' ? `<span class="m-live"><i></i>${esc((m.detail || T('LIVE')).slice(0, 18))}</span>`
+    : m.state === 'post' ? `<span class="m-ft">${esc((m.detail || 'FT').slice(0, 14))}</span>` : `<span class="m-time">${esc(kickoff(m.start))}</span>`;
+  const side = (s, score, bold) => `<div class="m-side ${bold ? 'win' : ''}"><span class="m-logo">${s.logo ? `<img src="${esc(s.logo)}" alt="" loading="lazy">` : esc((s.name || '?')[0])}</span><span class="m-name">${esc(s.name)}</span>${score != null ? `<b>${esc(score)}</b>` : ''}</div>`;
+  const body = m.sides.length === 2 ? m.sides.map(s => side(s, m.state === 'pre' ? null : (s.score ?? '0'), m.state === 'post' && s.winner)).join('')
+    : `<div class="m-title">${esc(m.title)}</div>${m.sides.slice(0, 3).map((s, k) => side(Object.assign({}, s, { name: `${k + 1}. ${s.name}` }), null, k === 0 && m.state === 'post')).join('')}`;
+  return `<button class="match ${m.state === 'in' ? 'is-live' : ''}" data-m="${i}" style="--mc:${sp.c1}"><div class="m-top"><span class="dim">${sp.emoji} ${esc(m.league)}</span>${status}</div>${body}
+    <div class="m-foot"><span class="dim">${m.tv.length ? '📺 ' + esc(m.tv.slice(0, 3).join(', ')) : esc(m.venue)}</span>${watch ? `<span class="m-watch">▶ ${T('Watch')}</span>` : ''}</div></button>`;
+}
+function findStream(m, evs) {
+  if (!evs.length) return null;
+  const keys = s => [s.short.toLowerCase(), ...s.name.toLowerCase().split(/[ .-]/).filter(w => w.length >= 4 && !['united', 'city', 'club', 'real', 'sporting', 'athletic'].includes(w))].filter(k => k.length > 2);
+  if (m.sides.length === 2) { const [a, b] = m.sides.map(keys);
+    return evs.find(e => { const t = `${e.m.name} ${e.m.description || ''}`.toLowerCase(); return a.some(k => t.includes(k)) && b.some(k => t.includes(k)); }) || null; }
+  return evs.find(e => m.title.toLowerCase().split(' ').filter(w => w.length >= 5).some(w => e.m.name.toLowerCase().includes(w))) || null;
+}
+const matchRow = (list, evs = []) => `<div class="rail gutter m-rail">${list.map((m, i) => matchCard(m, i, !!findStream(m, evs))).join('')}</div>`;
+
+/** Live Sports tab: live now, the 8 animated sports, starting soon and latest results. Refreshes every 30 s. */
+async function sportsHubView(token) {
+  const draw = (all) => {
+    const now = Date.now();
+    const live = all ? all.filter(m => m.state === 'in').sort((a, b) => a.start - b.start) : [];
+    const soon = (all || []).filter(m => m.state === 'pre' && m.start - now >= 0 && m.start - now < 18 * 36e5).sort((a, b) => a.start - b.start).slice(0, 30);
+    const done = (all || []).filter(m => m.state === 'post' && now - m.start < 14 * 36e5).sort((a, b) => b.start - a.start).slice(0, 30);
+    const count = {}; live.forEach(m => { count[m.sport] = (count[m.sport] || 0) + 1; });
+    const lists = [live, soon, done];
+    view.innerHTML = `<div class="sports-head"><div class="gutter"><h1><i class="live-dot"></i>${T('Live Sports')}</h1>
+      <p class="dim">${!all ? T('Loading scores…') : live.length ? `${live.length} ${T('live now')} · ${T('updates every 30 seconds')}` : T('Scores, fixtures and channels — all in one place')}</p></div></div>
+      ${sectionH(live.length ? `Live now` : 'Live now')}
+      ${!all ? `<div class="rail gutter">${'<div class="sk match-sk"></div>'.repeat(3)}</div>` : live.length ? `<div data-l="0">${matchRow(live)}</div>` : `<p class="gutter dim">${T('No matches are live right now. Check “Starting soon” below.')}</p>`}
+      ${sectionH('Sports')}
+      <div class="gutter sport-grid">${SPORTS.map((sp, i) => `<a class="tile genre sport big" href="#/catalog/sport/${sp.key}" style="${tileStyle(sp.c1, sp.c2, i)}"><canvas data-scene="sp_${sp.key}" data-i="${i}"></canvas>${count[sp.key] ? `<span class="live-b">● ${count[sp.key]} ${T('LIVE')}</span>` : ''}<span class="lbl"><b>${sp.emoji} ${esc(T(sp.name))}</b></span></a>`).join('')}</div>
+      ${soon.length ? sectionH('Starting soon') + `<div data-l="1">${matchRow(soon)}</div>` : ''}
+      ${done.length ? sectionH('Latest results') + `<div data-l="2">${matchRow(done)}</div>` : ''}
+      <p class="gutter dim small-note">${T('Scores and TV channels: ESPN public scoreboard. Streams appear on matches when an addon you installed offers them.')}</p>`;
+    view.querySelectorAll('canvas[data-scene]').forEach(c => window.GenreScenes && GenreScenes.attach(c, c.dataset.scene, +c.dataset.i));
+    view.querySelectorAll('[data-l]').forEach(box => box.querySelectorAll('.match').forEach(b => b.onclick = () => { location.hash = `#/catalog/sport/${lists[+box.dataset.l][+b.dataset.m].sport}`; }));
+  };
+  draw(null);
+  const tick = async () => { const all = await liveNow(); if (token === routeToken) { const y = scrollY; draw(all); scrollTo(0, y); setTimeout(tick, 30000); } };
+  tick();
+}
+
+/** Streams for an addon event: ask the addon it came from, then any other stream addon. */
+async function openEventStreams(e, sp) {
+  sheet(e.m.name, [{ icon: 'search', t: 'Finding streams…', keep: true }]);
+  const others = S.addons.filter(a => !a.builtIn && supports(a, 'stream') && addonBase(a) !== addonBase(e.addon));
+  const res = await Promise.all([e.addon, ...others].map(a => getJSON(`${addonBase(a)}/stream/${e.type}/${encodeURIComponent(e.m.id)}.json`)
+    .then(r => (r.streams || []).filter(x => x.url).map(x => ({ a, x }))).catch(() => [])));
+  const streams = res.flat();
+  if (!streams.length) { sheet(e.m.name, [{ icon: 'info', t: 'No streams available for this event yet. Try again closer to the start time.' }]); return; }
+  sheet(e.m.name, streams.map(({ a, x }) => ({ icon: 'play', t: (x.name || a.name).replace(/\n/g, ' '), s: [x.title, x.description].filter(Boolean).join(' · ').slice(0, 120),
+    fn: () => startPlayer({ type: 'live', id: null, local: true, title: e.m.name, subtitle: `${sp.emoji} ${T(sp.name)}`, url: x.url, addon: a.name }) })));
+}
+/** Events from your installed addons' catalogs that match this sport (by catalog name or genre option). */
+async function sportEvents(sp) {
   const addons = S.addons.filter(a => !a.builtIn && supports(a, 'catalog'));
   const lists = await Promise.all(addons.map(async a => {
     try {
@@ -693,23 +799,54 @@ async function sportView(key, token) {
       return per.flat();
     } catch { return []; }
   }));
+  const seen = new Set(); return lists.flat().filter(e => { const k = e.type + ':' + e.m.id; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+/** One sport: league chips, live / upcoming / results with TV channels, and streams from your addons. */
+async function sportView(key, token) {
+  const sp = SPORTS.find(x => x.key === key); if (!sp) { location.replace('#/sports'); return; }
+  const leagues = SPORT_LEAGUES[sp.key] || [];
+  let lg = leagues[0], matches = null, evs = null;
+  view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
+    <div class="banner" style="--c1:${sp.c1};--c2:${sp.c2}"><canvas id="bn-scene"></canvas>
+      <div class="ttl"><span style="font-size:44px">${sp.emoji}</span><div><h1>${esc(T(sp.name))} <span id="sp-live"></span></h1><p>${esc(T('Live scores, fixtures and TV channels'))}</p></div></div></div>
+    ${leagues.length > 1 ? `<div class="gutter chips" id="lg">${leagues.map((l, i) => `<button class="chip ${i ? '' : 'on'}" data-i="${i}">${esc(l[1])}</button>`).join('')}</div>` : ''}
+    <div id="sp-matches"><div class="rail gutter">${'<div class="sk match-sk"></div>'.repeat(3)}</div></div>
+    ${sectionH('From your addons')}
+    <div class="gutter"><div class="grid events" id="ev">${Array.from({ length: 3 }, () => '<div class="sk" style="aspect-ratio:16/10;border-radius:16px"></div>').join('')}</div></div>`;
+  GenreScenes.attach($('#bn-scene'), 'sp_' + sp.key, 0);
+  const drawMatches = () => {
+    const box = $('#sp-matches'); if (!box || !matches) return;
+    const now = Date.now(), e = evs || [];
+    const live = matches.filter(m => m.state === 'in'), up = matches.filter(m => m.state === 'pre' && m.start >= now - 36e5).sort((a, b) => a.start - b.start).slice(0, 40),
+      res = matches.filter(m => m.state === 'post').sort((a, b) => b.start - a.start).slice(0, 40);
+    $('#sp-live').innerHTML = live.length ? `<span class="live-b inline">● ${live.length} ${T('LIVE')}</span>` : '';
+    const groups = [['Live now', live], ['Upcoming', up], ['Results', res]].filter(g => g[1].length);
+    box.innerHTML = groups.length ? groups.map(([t, l], gi) => `<div class="sub-h gutter">${gi === 0 && t === 'Live now' ? '<i class="live-dot"></i>' : ''}${T(t)} · ${l.length}</div><div data-g="${gi}">${matchRow(l, e)}</div>`).join('')
+      : `<p class="gutter dim">${T('No matches in this league this week.')}</p>`;
+    box.querySelectorAll('[data-g]').forEach(g => g.querySelectorAll('.match').forEach(b => b.onclick = () => {
+      const m = groups[+g.dataset.g][1][+b.dataset.m]; const ev = findStream(m, e);
+      if (ev) return openEventStreams(ev, sp);
+      const title = m.sides.length === 2 ? m.sides.map(s => s.name).join('  vs  ') : m.title;
+      sheet(title, [{ icon: 'info', t: `${m.league} · ${m.state === 'pre' ? kickoff(m.start) : m.detail}`, s: [m.sides.length === 2 && m.state !== 'pre' ? m.sides.map(s => s.score ?? '-').join(' – ') : '', m.venue ? '🏟️ ' + m.venue : '', m.tv.length ? '📺 ' + m.tv.join(', ') : ''].filter(Boolean).join('  ·  ') },
+        { icon: 'info', t: 'None of your addons has a stream for this match right now.' }]);
+    }));
+  };
+  const loadLeague = async () => { const mine = lg; matches = null; $('#sp-matches').innerHTML = `<div class="rail gutter">${'<div class="sk match-sk"></div>'.repeat(3)}</div>`;
+    const r = await leagueOverview(sp.key, mine); if (token !== routeToken || mine !== lg) return; matches = r; drawMatches(); };
+  $('#lg')?.querySelectorAll('.chip').forEach(b => b.onclick = () => { $('#lg').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); lg = leagues[+b.dataset.i]; loadLeague(); });
+  if (lg) loadLeague(); else { matches = []; drawMatches(); }
+  const refresh = async () => { if (token !== routeToken) return; if (lg && matches) { const r = await leagueOverview(sp.key, lg); if (token === routeToken) { matches = r; drawMatches(); } } setTimeout(refresh, 30000); };
+  setTimeout(refresh, 30000);
+  evs = await sportEvents(sp);
   if (token !== routeToken) return;
-  const seen = new Set(); const evs = lists.flat().filter(e => { const k = e.type + ':' + e.m.id; if (seen.has(k)) return false; seen.add(k); return true; });
+  drawMatches();
   const box = $('#ev');
-  if (!evs.length) { box.outerHTML = msg('No live events right now', `Live Sports shows the ${sp.name} catalogs of the sports addons you install. Add one in Settings → Stream addons (paste its manifest link), then come back.`, `<button class="btn acc" onclick="route()">${T('Refresh')}</button>`); return; }
+  if (!evs.length) { box.outerHTML = `<p class="gutter dim">${T(`No ${sp.name} streams from your addons yet. Install a sports addon in Settings → Stream addons (paste its manifest link), then refresh.`)}</p>`; return; }
   box.innerHTML = evs.map((e, i) => { const img = e.m.background || e.m.poster;
     return `<button class="event" data-i="${i}"><span class="ev-img">${img ? `<img src="${esc(img)}" alt="" loading="lazy">` : `<b>${esc(e.m.name.slice(0, 2))}</b>`}${e.m.releaseInfo ? `<span class="ev-time">${esc(e.m.releaseInfo)}</span>` : ''}<span class="ev-play">${ic('play')}</span></span>
       <span class="ev-name">${esc(e.m.name)}</span>${e.m.description ? `<span class="dim ev-desc">${esc(e.m.description)}</span>` : ''}</button>`; }).join('');
-  box.querySelectorAll('.event').forEach(b => b.onclick = async () => {
-    const e = evs[+b.dataset.i]; sheet(e.m.name, [{ icon: 'search', t: 'Finding streams…', keep: true }]);
-    const others = S.addons.filter(a => !a.builtIn && supports(a, 'stream') && addonBase(a) !== addonBase(e.addon));
-    const res = await Promise.all([e.addon, ...others].map(a => getJSON(`${addonBase(a)}/stream/${e.type}/${encodeURIComponent(e.m.id)}.json`)
-      .then(r => (r.streams || []).filter(x => x.url).map(x => ({ a, x }))).catch(() => [])));
-    const streams = res.flat();
-    if (!streams.length) { sheet(e.m.name, [{ icon: 'info', t: 'No streams available for this event yet. Try again closer to the start time.' }]); return; }
-    sheet(e.m.name, streams.map(({ a, x }) => ({ icon: 'play', t: (x.name || a.name).replace(/\n/g, ' '), s: [x.title, x.description].filter(Boolean).join(' · ').slice(0, 120),
-      fn: () => startPlayer({ type: 'live', id: null, local: true, title: e.m.name, subtitle: `${sp.emoji} ${T(sp.name)}`, url: x.url, addon: a.name }) })));
-  });
+  box.querySelectorAll('.event').forEach(b => b.onclick = () => openEventStreams(evs[+b.dataset.i], sp));
 }
 
 async function catalogView(kind, key, token) {
