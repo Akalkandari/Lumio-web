@@ -243,7 +243,7 @@ function rememberSynced(at, data) {
   BASE = at; lastPushed = JSON.stringify(data);
   raw.set(baseKey(), BASE); raw.set(pushedKey(), lastPushed); raw.set('lumio.lastSync', Date.now());
 }
-const serial = fn => { const p = syncChain.then(fn, fn); syncChain = p.catch(() => {}); return p; };
+const serial = fn => { const run = () => fn(); const p = syncChain.then(run, run); syncChain = p.catch(() => {}); return p; };
 function mergeCD(remote, local) {
   const out = Object.assign({}, remote);
   for (const [k, lv] of Object.entries(local)) {
@@ -264,7 +264,12 @@ function mergeCD(remote, local) {
           o[key] = (r[key] || []).concat(l[key] || []).filter(x => { const id = x.startMs + ':' + x.endMs; if (seen.has(id)) return false; seen.add(id); return true; }).sort((a, b) => a.startMs - b.startMs);
         }
         out[k] = JSON.stringify(o);
-      }   // settings: cloud wins
+      } else if (k.startsWith('settings')) {   // cloud wins, but keep every addon from every device
+        const r = JSON.parse(rv), l = JSON.parse(lv);
+        const ra = Array.isArray(r.addons) ? r.addons : [], la = Array.isArray(l.addons) ? l.addons : [];
+        const extra = la.filter(a => !ra.some(x => x.manifestUrl === a.manifestUrl));
+        if (extra.length) { r.addons = ra.concat(extra); out[k] = JSON.stringify(r); }
+      }
     } catch { /* keep the cloud's copy */ }
   }
   return out;
@@ -295,7 +300,7 @@ async function upload(data, at) {
   return true;
 }
 /** Returns true when the account has data (callers then refresh the screen). */
-async function cloudPullNow() {
+async function cloudPullNow(combine) {
   for (let i = 0; i < 4; i++) {
     const row = await fetchRow();
     const changed = JSON.stringify(CD) !== lastPushed;
@@ -306,8 +311,8 @@ async function cloudPullNow() {
       continue;
     }
     let up = null;
-    if (row.at === BASE) { if (changed) up = CD; }                 // only this browser changed
-    else if (BASE && !changed) CD = row.data;                      // only other devices changed
+    if (!combine && row.at === BASE) { if (changed) up = CD; }                 // only this browser changed
+    else if (!combine && BASE && !changed) CD = row.data;                      // only other devices changed
     else { CD = mergeCD(row.data, CD); if (JSON.stringify(CD) !== JSON.stringify(row.data)) up = CD; }   // both: combine
     raw.set(cacheKey(), CD);
     if (!up) { rememberSynced(row.at, CD); return true; }
@@ -1412,7 +1417,7 @@ function settingsView() {
   </div>`;
   $('#signout').onclick = signOut;
   $('#pswitch').onclick = () => { PROFILE_CHOSEN = false; profilesView(); };
-  $('#psync').onclick = async () => { toast('Syncing…'); try { await cloudPull(); await cloudPush(true); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); settingsView(); } catch { toast('Network error'); } };
+  $('#psync').onclick = async () => { toast('Syncing…'); try { await serial(() => cloudPullNow(true)); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); settingsView(); } catch { toast('Network error'); } };
   view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
   const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
   toggle('amoled', 'amoled'); toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
