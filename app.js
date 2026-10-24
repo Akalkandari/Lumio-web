@@ -106,33 +106,157 @@ const ic = (name, extra = '') => `<svg viewBox="0 0 24 24" fill="currentColor" a
 const ic10 = name => `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${P[name]}"/><text x="12" y="16.3" text-anchor="middle" font-size="6.5" font-weight="700" fill="currentColor">10</text></svg>`;
 
 // ============================================================================ storage
-// Accounts: every email gets its own space (settings, library, history, locks, filters).
+// ============================================================================ account data (shared with the Android app)
+// One Lumio account works on the phone app, the Fold and this website: data is kept in the app's own format
+// (profiles, settings.<id>, library.<id>, scene_filters.<id>) and synced through Supabase.
+const SB_URL = 'https://rdkkkoypfkwjzceswhrq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJka2trb3lwZmt3anpjZXN3aHJxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODc5NzEsImV4cCI6MjEwODM2Mzk3MX0.DUKI8PK7UjBqj7q9qmSqZd-3IXtLi5NMW7m0YkfJzC4';
 const raw = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full or blocked */ } },
   del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
 };
-const normEmail = e => String(e || '').trim().toLowerCase();
-const userId = email => { let h = 0x811c9dc5; for (const c of normEmail(email)) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); };
-let ACCOUNT = raw.get('lumio.account', null);            // { email, id }
-const store = {
-  pfx() { return ACCOUNT ? `lumio.u.${ACCOUNT.id}.` : 'lumio.'; },
-  get(k, d) { return raw.get(this.pfx() + k, d); },
-  set(k, v) { raw.set(this.pfx() + k, v); },
-};
-const DEFAULT_SETTINGS = {
-  tmdbKey: '', region: 'US', accent: 'violet', customAccent: '#7C5CFF', amoled: false,
-  skipIntro: 'button', skipRecap: 'button', skipCredits: 'button', skipNudity: false,
-  subLang: 'en', subScale: 1, subBg: true, autoNext: true, addons: null, lang: 'en',
-};
-let S, LIB;
-function loadAccountData() {
-  S = Object.assign({}, DEFAULT_SETTINGS, { lang: raw.get('lumio.deviceLang', 'en') }, store.get('settings', {}));
-  if (!S.addons) S.addons = BUILT_IN_ADDONS.slice();
-  LIB = store.get('library', []);
+const jparse = (str, d) => { try { return str == null ? d : JSON.parse(str); } catch { return d; } };
+let SESSION = raw.get('lumio.session', null);   // { access, refresh, expires, uid, email }
+let CD = {};                                      // account data: key → JSON string (same keys as the app)
+const MAIN = 'main';
+let PROFILE_ID = MAIN;
+const kS = id => id === MAIN ? 'settings' : 'settings.' + id;
+const kL = id => id === MAIN ? 'library' : 'library.' + id;
+const kF = id => id === MAIN ? 'scene_filters' : 'scene_filters.' + id;
+const cacheKey = () => 'lumio.cd.' + (SESSION?.uid || 'local');
+
+// ---- profiles
+const normProfile = p => ({ id: p.id, name: p.name || '', avatar: p.avatar || 'a:rocket', avatarUrl: p.avatarUrl || null, pinHash: p.pinHash || null, shareAddons: p.shareAddons !== false });
+function profiles() {
+  const list = jparse(CD.profiles, null);
+  return Array.isArray(list) && list.length ? list.map(normProfile) : [normProfile({ id: MAIN, name: 'Me' })];
 }
-const saveSettings = () => { store.set('settings', S); applyTheme(); applyLang(); };
-const saveLib = () => store.set('library', LIB.slice(0, 500));
+function saveProfiles(list) {
+  CD.profiles = JSON.stringify(list.map(p => { const o = { id: p.id, name: p.name, avatar: p.avatar, shareAddons: p.shareAddons }; if (p.avatarUrl) o.avatarUrl = p.avatarUrl; if (p.pinHash) o.pinHash = p.pinHash; return o; }));
+  dataChanged();
+}
+const activeProfile = () => profiles().find(p => p.id === PROFILE_ID) || profiles()[0];
+const sharingAddons = () => { const p = activeProfile(); return p.id !== MAIN && p.shareAddons; };
+
+// ---- settings: app format ↔ web
+const hexToLong = h => 0xFF000000 + parseInt(String(h).replace('#', '').slice(0, 6) || '7C5CFF', 16);
+const longToHex = n => '#' + ((Number(n) >>> 0) & 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
+function rawSettings(id) { const v = jparse(CD[kS(id)], null); return v || (id === MAIN ? {} : rawSettings(MAIN)); }
+function fromApp(a) {
+  return {
+    tmdbKey: a.tmdbKey || '', region: a.region || 'US',
+    accent: a.accentPreset || 'violet', customAccent: longToHex(a.customAccent ?? 0xFF7C5CFF), amoled: !!a.amoled,
+    skipIntro: (a.skipIntro || 'BUTTON').toLowerCase(), skipRecap: (a.skipRecap || 'BUTTON').toLowerCase(), skipCredits: (a.skipCredits || 'BUTTON').toLowerCase(),
+    skipNudity: !!a.skipNudity, subLang: a.subtitleLanguage || 'en', subScale: a.subtitleScale ?? 1, subBg: a.subtitleBackground ?? true,
+    autoNext: a.autoPlayNext ?? true, lang: a.language || raw.get('lumio.deviceLang', 'en'),
+    addons: Array.isArray(a.addons) ? a.addons.map(x => ({ url: x.manifestUrl, name: x.name, resources: x.resources || [], builtIn: !!x.builtIn }))
+      : (a.builtInAddonsVersion ? [] : BUILT_IN_ADDONS.slice()),
+  };
+}
+function toApp(w, base) {
+  return Object.assign({}, base, {
+    tmdbKey: w.tmdbKey, region: w.region, accentPreset: w.accent, customAccent: hexToLong(w.customAccent), amoled: !!w.amoled,
+    skipIntro: w.skipIntro.toUpperCase(), skipRecap: w.skipRecap.toUpperCase(), skipCredits: w.skipCredits.toUpperCase(), skipNudity: !!w.skipNudity,
+    subtitleLanguage: w.subLang, subtitleScale: w.subScale, subtitleBackground: w.subBg, autoPlayNext: w.autoNext, language: w.lang,
+    addons: w.addons.map(x => ({ manifestUrl: x.url, name: x.name, resources: x.resources || [], builtIn: !!x.builtIn })),
+    builtInAddonsVersion: Math.max(base.builtInAddonsVersion || 0, 1),
+  });
+}
+// ---- library entries: app format ↔ web
+const fromEntry = e => ({ type: e.type, id: e.tmdbId, title: e.title || '', poster: e.posterPath || null, backdrop: e.backdropPath || null, watch: !!e.inWatchlist,
+  pos: e.positionMs || 0, dur: e.durationMs || 0, season: e.season ?? null, episode: e.episode ?? null, url: e.lastStreamUrl || null, imdb: e.imdbId || null,
+  addon: e.addonName || null, watched: !!e.watched, pin: e.pinHash || null, updatedAt: e.updatedAt || 0 });
+const toEntry = x => ({ tmdbId: x.id, type: x.type, title: x.title || '', posterPath: x.poster || null, backdropPath: x.backdrop || null, inWatchlist: !!x.watch,
+  positionMs: Math.round(x.pos || 0), durationMs: Math.round(x.dur || 0), season: x.season ?? null, episode: x.episode ?? null,
+  lastStreamUrl: x.url && !String(x.url).startsWith('blob:') ? x.url : null, imdbId: x.imdb || null, addonName: x.addon || null,
+  watched: !!x.watched, pinHash: x.pin || null, updatedAt: x.updatedAt || Date.now() });
+
+const DEFAULT_SETTINGS = fromApp({});
+let S, LIB;
+function loadProfileData() {
+  S = fromApp(rawSettings(PROFILE_ID));
+  if (sharingAddons()) S.addons = fromApp(rawSettings(MAIN)).addons;
+  LIB = jparse(CD[kL(PROFILE_ID)], []).map(fromEntry);
+}
+const saveSettings = () => {
+  const base = rawSettings(PROFILE_ID);
+  const next = toApp(S, base);
+  if (sharingAddons()) {   // addon changes belong to the main profile
+    const main = rawSettings(MAIN);
+    CD[kS(MAIN)] = JSON.stringify(Object.assign({}, main, { addons: next.addons, builtInAddonsVersion: Math.max(main.builtInAddonsVersion || 0, 1) }));
+    if ('addons' in base) next.addons = base.addons; else delete next.addons;
+  }
+  CD[kS(PROFILE_ID)] = JSON.stringify(next);
+  dataChanged(); applyTheme(); applyLang();
+};
+const saveLib = () => { CD[kL(PROFILE_ID)] = JSON.stringify(LIB.slice(0, 500).map(toEntry)); dataChanged(); };
+// Scene filters (only thing still read through `store`)
+const store = {
+  get(k, d) {
+    if (k !== 'filters') return d;
+    const out = {};
+    for (const [key, list] of Object.entries(jparse(CD[kF(PROFILE_ID)], {}))) out[key] = list.map(x => ({ kind: x.kind || 'nudity', start: x.startMs, end: x.endMs, source: x.source || '' }));
+    return out;
+  },
+  set(k, v) {
+    if (k !== 'filters') return;
+    const out = {};
+    for (const [key, list] of Object.entries(v)) out[key] = list.map(x => ({ kind: x.kind, startMs: Math.round(x.start), endMs: Math.round(x.end), source: x.source || '' }));
+    CD[kF(PROFILE_ID)] = JSON.stringify(out); dataChanged();
+  },
+};
+
+// ---- Supabase auth + sync
+let pushTimer = null, lastPushed = '';
+function dataChanged() { raw.set(cacheKey(), CD); clearTimeout(pushTimer); pushTimer = setTimeout(() => cloudPush(), 2000); }
+function friendlyAuth(m) {
+  if (/Invalid login credentials/i.test(m)) return 'Wrong email or password';
+  if (/already (been )?registered/i.test(m)) return 'An account with this email already exists. Sign in instead.';
+  if (/Email not confirmed/i.test(m)) return 'Please confirm your email first (check your inbox).';
+  if (/Password should be/i.test(m)) return 'Password must be at least 6 characters';
+  if (/rate limit/i.test(m)) return 'Too many attempts. Try again in a minute.';
+  return m;
+}
+async function authCall(path, body, tok) {
+  const r = await fetch(`${SB_URL}/auth/v1/${path}`, { method: 'POST', headers: Object.assign({ apikey: SB_KEY, 'Content-Type': 'application/json' }, tok ? { Authorization: 'Bearer ' + tok } : {}), body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(friendlyAuth(j.msg || j.error_description || j.message || j.error || 'HTTP ' + r.status));
+  return j;
+}
+function saveSession(j) {
+  SESSION = { access: j.access_token, refresh: j.refresh_token, expires: Date.now() + (j.expires_in || 3600) * 1000, uid: j.user?.id || SESSION?.uid, email: j.user?.email || SESSION?.email };
+  raw.set('lumio.session', SESSION);
+}
+async function sbToken() {
+  if (!SESSION) throw new Error('Signed out');
+  if (Date.now() > SESSION.expires - 60000) saveSession(await authCall('token?grant_type=refresh_token', { refresh_token: SESSION.refresh }));
+  return SESSION.access;
+}
+async function cloudPull() {
+  const t = await sbToken();
+  const r = await fetch(`${SB_URL}/rest/v1/user_data?select=data&user_id=eq.${SESSION.uid}`, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + t } });
+  if (!r.ok) throw new Error('Sync failed');
+  const d = (await r.json())[0]?.data;
+  if (!d || !Object.keys(d).length) return false;
+  CD = {}; for (const [k, v] of Object.entries(d)) CD[k] = typeof v === 'string' ? v : JSON.stringify(v);
+  raw.set(cacheKey(), CD); lastPushed = JSON.stringify(CD); raw.set('lumio.lastSync', Date.now());
+  return true;
+}
+async function cloudPush(force) {
+  if (!SESSION) return;
+  const body = JSON.stringify(CD);
+  if (!force && body === lastPushed) return;
+  try {
+    const t = await sbToken();
+    const r = await fetch(`${SB_URL}/rest/v1/user_data?on_conflict=user_id`, {
+      method: 'POST', keepalive: body.length < 60000,
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + t, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ user_id: SESSION.uid, data: CD, updated_at: new Date().toISOString() }),
+    });
+    if (r.ok) { lastPushed = body; raw.set('lumio.lastSync', Date.now()); }
+  } catch { /* offline: retried on the next change */ }
+}
 const libEntry = (type, id) => LIB.find(e => e.type === type && e.id === id);
 function updateLib(type, id, fn) {
   const i = LIB.findIndex(e => e.type === type && e.id === id);
@@ -313,7 +437,8 @@ function renderNav(active) {
 }
 let lastHash = '';
 async function route() {
-  if (!ACCOUNT) { welcomeView(); return; }
+  if (!SESSION) { loginView(); return; }
+  if (!PROFILE_CHOSEN) { profilesView(); return; }
   const hash = location.hash || '#/home';
   scrollMemo[lastHash] = scrollY; lastHash = hash;
   const [, name = 'home', ...args] = hash.slice(1).split('/');
@@ -961,64 +1086,212 @@ document.addEventListener('touchmove', e => { if (!lpXY) return; const t = e.tou
 document.addEventListener('click', e => { if (lpFired && e.target.closest('.poster')) { e.preventDefault(); e.stopPropagation(); lpFired = false; } }, true);
 document.addEventListener('contextmenu', e => { const p = e.target.closest('.poster'); if (p) { e.preventDefault(); openPosterMenu(p); } });
 
-// ============================================================================ welcome & accounts
-function signIn(email) {
-  email = normEmail(email);
-  const id = userId(email);
-  const accounts = raw.get('lumio.accounts', []);
-  // First person to sign in on this device keeps the data used before accounts existed
-  if (!accounts.length && !raw.get(`lumio.u.${id}.settings`, null)) {
-    for (const k of ['settings', 'library', 'filters']) { const v = raw.get('lumio.' + k, null); if (v != null) { raw.set(`lumio.u.${id}.${k}`, v); raw.del('lumio.' + k); } }
-  }
-  raw.set('lumio.accounts', [{ email, id, last: Date.now() }, ...accounts.filter(a => a.id !== id)].slice(0, 12));
-  ACCOUNT = { email, id }; raw.set('lumio.account', ACCOUNT);
-  unlocked.clear(); cache.clear(); servicesReady = null;
-  loadAccountData(); applyTheme(); applyLang();
-  $('.welcome')?.remove();
-  if (location.hash !== '#/home') location.hash = '#/home'; else route();
-  toast(T('Welcome') + ' ' + email.split('@')[0]);
+// ============================================================================ sign-in, profiles & avatars
+const AVATARS_ANIMATED = [
+  ['a:rocket', '🚀', '#3A2D8F', '#120B3D', 'fly'], ['a:unicorn', '🦄', '#E66BD1', '#5B1E7A', 'bounce'], ['a:fire', '🔥', '#FF7A1A', '#5C1300', 'flicker'],
+  ['a:alien', '👾', '#27C281', '#06402A', 'wobble'], ['a:dragon', '🐉', '#2F9E44', '#0D3316', 'sway'], ['a:butterfly', '🦋', '#3BA7FF', '#0B2F5C', 'flutter'],
+  ['a:dino', '🦖', '#6B8E23', '#23300A', 'stomp'], ['a:star', '⭐', '#F5B700', '#5C4400', 'spin'], ['a:popcorn', '🍿', '#E63946', '#5C0A12', 'pop'],
+  ['a:planet', '🪐', '#8E7CFF', '#221A5C', 'orbit'], ['a:whale', '🐳', '#1A8FE3', '#07304F', 'float'], ['a:wave', '👋', '#FFB86B', '#5C3300', 'wave'],
+  ['a:ghost', '👻', '#6C63FF', '#1B1747', 'float'], ['a:clapper', '🎬', '#4A4E69', '#101222', 'wobble'],
+];
+const AVATARS_CLASSIC = [
+  ['s:fox', '🦊', '#FF8C42', '#7A2E00'], ['s:panda', '🐼', '#9AA5B1', '#2B3138'], ['s:tiger', '🐯', '#FFA62B', '#6B3A00'], ['s:lion', '🦁', '#E9B949', '#5E4100'],
+  ['s:frog', '🐸', '#52B788', '#143D28'], ['s:penguin', '🐧', '#4D96FF', '#0E2A57'], ['s:koala', '🐨', '#A0A0B0', '#33333F'], ['s:octopus', '🐙', '#FF6B9A', '#5C0F2E'],
+  ['s:cat', '🐱', '#F4A261', '#5E2F0D'], ['s:dog', '🐶', '#D4A373', '#4A2F14'], ['s:robot', '🤖', '#00BBF9', '#003A52'], ['s:astronaut', '🧑‍🚀', '#5E60CE', '#1A1B4B'],
+  ['s:ninja', '🥷', '#495057', '#121416'], ['s:wizard', '🧙', '#7209B7', '#22033A'], ['s:crown', '👑', '#FFC300', '#5C4600'], ['s:heart', '💜', '#B5179E', '#3D0636'],
+];
+const AVATAR_MAP = Object.fromEntries([...AVATARS_ANIMATED, ...AVATARS_CLASSIC].map(a => [a[0], a]));
+function avatarHTML(id, url, size = 96) {
+  const r = Math.round(size * .24);
+  if (url) return `<span class="av" style="width:${size}px;height:${size}px;border-radius:${r}px"><img src="${esc(url)}" alt=""></span>`;
+  const [, emoji, c1, c2, motion] = AVATAR_MAP[id] || AVATARS_ANIMATED[0];
+  return `<span class="av ${motion ? 'av-anim m-' + motion : ''}" style="width:${size}px;height:${size}px;border-radius:${r}px;--c1:${c1};--c2:${c2};font-size:${Math.round(size * .52)}px"><i>${emoji}</i></span>`;
 }
-function signOut() {
-  closePlayer(true); ACCOUNT = null; raw.del('lumio.account');
-  loadAccountData(); applyTheme(); applyLang();
-  welcomeView();
-}
-const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normEmail(e));
-async function welcomeView() {
-  renderNav(null); view.innerHTML = '';
-  $('.welcome')?.remove();
-  const accounts = raw.get('lumio.accounts', []);
+const profilePinHash = async (id, pin) => {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`lumio:profile:${id}:${pin}`));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+};
+let PROFILE_CHOSEN = false;
+function lumioLogo() { return `<div class="logo-row"><span class="olive-logo">${ic('play')}</span><b>Lumio</b></div>`; }
+
+// ---- login (email + password, same account as the Android app)
+async function loginView() {
+  renderNav(null); view.innerHTML = ''; document.querySelectorAll('.welcome').forEach(x => x.remove());
+  let creating = false;
   const w = document.createElement('div'); w.className = 'welcome';
-  w.innerHTML = `<div class="wall" id="wall"></div><div class="wshade"></div>
-    <div class="wbox">
-      <div class="wlogo">${ic('play')}</div>
-      <h1>${T('Welcome to Lumio')}</h1>
-      <p class="dim">${T('Sign in with your email to keep your own library, history and settings.')}</p>
-      <form id="wf" novalidate>
-        <input class="field" id="we" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="${T('Your email')}" aria-label="${T('Your email')}">
-        <div class="werr" id="werr"></div>
-        <button class="btn acc wgo" type="submit">${T('Continue')}</button>
+  const draw = () => {
+    w.querySelector('.wbox').innerHTML = `${lumioLogo()}
+      <div class="seg"><button data-m="0" class="${!creating ? 'on' : ''}">${T('Sign in')}</button><button data-m="1" class="${creating ? 'on' : ''}">${T('Create account')}</button></div>
+      <h1>${T(creating ? 'Create your Lumio account' : 'Welcome back')}</h1>
+      <p class="dim">${T('Your profiles, library and history on every device')}</p>
+      <form id="lf" novalidate>
+        <input class="field" id="le" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="${T('Email')}" aria-label="${T('Email')}">
+        <div class="pw"><input class="field" id="lp" type="password" autocomplete="${creating ? 'new-password' : 'current-password'}" placeholder="${T('Password')}" aria-label="${T('Password')}"><button type="button" id="lshow" aria-label="Show password">${ic('eyeOff')}</button></div>
+        <div class="werr" id="lerr"></div>
+        <button class="btn wgo olive" type="submit" id="lgo">${T(creating ? 'Create account' : 'Sign in')}</button>
       </form>
-      ${accounts.length ? `<div class="wacc"><small class="dim">${T('On this device')}</small>${accounts.map(a => `<button class="chip" data-e="${esc(a.email)}">${esc(a.email)}</button>`).join('')}</div>` : ''}
-      <div class="wlang"><button data-l="en" class="${S.lang !== 'ar' ? 'on' : ''}">English</button><span>·</span><button data-l="ar" class="${S.lang === 'ar' ? 'on' : ''}">العربية</button></div>
-      <small class="dim wnote">${T('No password needed. Your data is saved on this device.')}</small>
-    </div>`;
-  document.body.appendChild(w);
-  const input = $('#we', w), err = $('#werr', w);
-  $('#wf', w).onsubmit = e => {
-    e.preventDefault();
-    if (!validEmail(input.value)) { err.textContent = T('Enter a valid email address'); input.focus(); w.querySelector('.wbox').classList.remove('shake'); void w.offsetWidth; w.querySelector('.wbox').classList.add('shake'); return; }
-    signIn(input.value);
+      ${creating ? '' : `<button class="linkbtn" id="lforgot">${T('Forgot password?')}</button>`}
+      <div class="wlang"><button data-l="en" class="${S.lang !== 'ar' ? 'on' : ''}">English</button><span>·</span><button data-l="ar" class="${S.lang === 'ar' ? 'on' : ''}">العربية</button></div>`;
+    const err = $('#lerr', w), email = $('#le', w), pw = $('#lp', w);
+    const shake = m => { err.textContent = T(m); err.style.color = '#FF6B6B'; const box = $('.wbox', w); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); };
+    w.querySelectorAll('.seg button').forEach(b => b.onclick = () => { creating = b.dataset.m === '1'; draw(); });
+    w.querySelectorAll('.wlang button').forEach(b => b.onclick = () => { raw.set('lumio.deviceLang', b.dataset.l); S.lang = b.dataset.l; applyLang(); draw(); });
+    $('#lshow', w).onclick = () => { pw.type = pw.type === 'password' ? 'text' : 'password'; };
+    $('#lforgot', w)?.addEventListener('click', async () => {
+      if (!validEmail(email.value)) return shake('Enter your email above, then tap “Forgot password?”');
+      try { await authCall('recover', { email: normEmail(email.value) }); err.style.color = '#B5D46B'; err.textContent = T('Password reset email sent'); } catch (e) { shake(e.message); }
+    });
+    $('#lf', w).onsubmit = async e => {
+      e.preventDefault();
+      if (!validEmail(email.value)) return shake('Enter a valid email address');
+      if (pw.value.length < 6) return shake('Password must be at least 6 characters');
+      const go = $('#lgo', w); go.disabled = true; go.innerHTML = '<span class="mini-spin"></span>';
+      try {
+        const j = creating ? await authCall('signup', { email: normEmail(email.value), password: pw.value })
+                           : await authCall('token?grant_type=password', { email: normEmail(email.value), password: pw.value });
+        if (!j.access_token) { err.style.color = '#B5D46B'; err.textContent = T('Account created. Check your email to confirm it, then sign in.'); go.disabled = false; go.textContent = T('Sign in'); creating = false; return; }
+        saveSession(j);
+        await afterSignIn();
+        w.remove();
+      } catch (ex) { go.disabled = false; go.textContent = T(creating ? 'Create account' : 'Sign in'); shake(ex.message || 'Network error'); }
+    };
   };
-  w.querySelectorAll('.wacc .chip').forEach(b => b.onclick = () => signIn(b.dataset.e));
-  w.querySelectorAll('.wlang button').forEach(b => b.onclick = () => { raw.set('lumio.deviceLang', b.dataset.l); S.lang = b.dataset.l; applyLang(); welcomeView(); });
-  // Slowly drifting wall of posters behind the form
+  w.innerHTML = `<div class="wall" id="wall"></div><div class="wshade"></div><div class="wbox"></div>`;
+  document.body.appendChild(w); draw();
   try {
     const list = (await api.trending('all', 'week')).filter(x => x.poster_path).slice(0, 18);
-    const wall = $('#wall', w); if (!wall) return;
     const col = k => `<div class="wcol" style="animation-duration:${38 + k * 7}s;animation-direction:${k % 2 ? 'reverse' : 'normal'}">${[...list, ...list].filter((_, i) => i % 4 === k).map(x => `<img src="${IMG}w342${x.poster_path}" alt="" loading="lazy">`).join('')}</div>`;
-    wall.innerHTML = [0, 1, 2, 3].map(col).join('');
-  } catch { /* offline: plain background */ }
+    const wall = $('#wall', w); if (wall) wall.innerHTML = [0, 1, 2, 3].map(col).join('');
+  } catch { /* offline */ }
+}
+const normEmail = e => String(e || '').trim().toLowerCase();
+const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normEmail(e));
+
+/** Load the account: cloud first; if the cloud is empty, upload what this browser had before. */
+async function afterSignIn() {
+  CD = raw.get(cacheKey(), {}) || {};
+  let found = false;
+  try { found = await cloudPull(); } catch { /* offline: use cached copy */ }
+  if (!found && !Object.keys(CD).length) {
+    // Bring over data from the older email-only website login, if any
+    const oldId = (() => { let h = 0x811c9dc5; for (const c of normEmail(SESSION.email)) { h ^= c.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(36); })();
+    const oldS = raw.get(`lumio.u.${oldId}.settings`, null) || raw.get('lumio.settings', null);
+    const oldL = raw.get(`lumio.u.${oldId}.library`, null) || raw.get('lumio.library', null);
+    const oldF = raw.get(`lumio.u.${oldId}.filters`, null) || raw.get('lumio.filters', null);
+    PROFILE_ID = MAIN;
+    if (oldS) { S = Object.assign({}, DEFAULT_SETTINGS, oldS); CD[kS(MAIN)] = JSON.stringify(toApp(S, {})); }
+    if (oldL) CD[kL(MAIN)] = JSON.stringify(oldL.map(toEntry));
+    if (oldF) { const o = {}; for (const [k, l] of Object.entries(oldF)) o[k] = l.map(x => ({ kind: x.kind, startMs: Math.round(x.start), endMs: Math.round(x.end), source: x.source || '' })); CD[kF(MAIN)] = JSON.stringify(o); }
+    if (!CD[kS(MAIN)]) CD[kS(MAIN)] = JSON.stringify(toApp(DEFAULT_SETTINGS, {}));
+    if (!CD.profiles) saveProfiles(profiles());
+    await cloudPush(true);
+  }
+  PROFILE_ID = raw.get('lumio.activeProfile.' + SESSION.uid, MAIN);
+  if (!profiles().some(p => p.id === PROFILE_ID)) PROFILE_ID = MAIN;
+  loadProfileData(); applyTheme(); applyLang();
+  PROFILE_CHOSEN = false;
+  profilesView();
+}
+async function signOut() {
+  closePlayer(true);
+  await cloudPush(true);
+  try { await authCall('logout', {}, SESSION?.access); } catch { /* ignore */ }
+  raw.del(cacheKey()); raw.del('lumio.session'); SESSION = null; CD = {}; PROFILE_ID = MAIN; PROFILE_CHOSEN = false;
+  unlocked.clear(); loadProfileData(); applyTheme(); applyLang();
+  loginView();
+}
+
+// ---- Who's watching? / Manage Profiles
+function profilesView(managing = false) {
+  renderNav(null); closePop();
+  document.querySelectorAll('.welcome').forEach(x => x.remove());
+  const list = profiles();
+  const w = document.createElement('div'); w.className = 'welcome profiles';
+  w.innerHTML = `<div class="pbox">${lumioLogo()}
+    <h1 class="who">${T(managing ? 'Manage Profiles' : "Who's watching?")}</h1>
+    <div class="pgrid">${list.map((p, i) => `<button class="ptile ${managing ? 'managing' : ''}" data-id="${esc(p.id)}" style="animation-delay:${i * 70}ms">
+        <span class="pav">${avatarHTML(p.avatar, p.avatarUrl, 96)}${p.pinHash && !managing ? `<span class="plock">${ic('lock')}</span>` : ''}${managing ? '<span class="pen">✏️</span>' : ''}</span>
+        <span class="pname">${esc(p.name || T('Profile'))}</span></button>`).join('')}
+      ${managing && list.length < 8 ? `<button class="ptile add" id="padd" style="animation-delay:${list.length * 70}ms"><span class="pav"><span class="addbox">+</span></span><span class="pname dim">${T('Add Profile')}</span></button>` : ''}</div>
+    <button class="btn outline" id="pmanage">${ic(managing ? 'check' : 'settings')}${T(managing ? 'Done' : 'Manage Profiles')}</button>
+    ${managing ? '' : `<button class="linkbtn" id="psignout">${T('Sign out')} · ${esc(SESSION?.email || '')}</button>`}</div>`;
+  document.body.appendChild(w);
+  w.querySelectorAll('.ptile[data-id]').forEach(b => b.onclick = async () => {
+    const p = profiles().find(x => x.id === b.dataset.id);
+    if (managing) return profileEditor(p, false);
+    if (p.pinHash) {
+      const ok = await pinPad({ title: p.name, check: async pin => (await profilePinHash(p.id, pin)) === p.pinHash });
+      if (!ok) return;
+    }
+    enterProfile(p.id);
+  });
+  $('#padd', w)?.addEventListener('click', () => {
+    const n = profiles().length;
+    profileEditor({ id: 'p' + Date.now().toString(36), name: '', avatar: AVATARS_ANIMATED[n % AVATARS_ANIMATED.length][0], avatarUrl: null, pinHash: null, shareAddons: true }, true);
+  });
+  $('#pmanage', w).onclick = () => profilesView(!managing);
+  $('#psignout', w)?.addEventListener('click', signOut);
+}
+function enterProfile(id) {
+  PROFILE_ID = id; raw.set('lumio.activeProfile.' + SESSION.uid, id);
+  unlocked.clear(); loadProfileData(); applyTheme(); applyLang();
+  PROFILE_CHOSEN = true;
+  document.querySelectorAll('.welcome').forEach(x => x.remove());
+  if (location.hash !== '#/home') location.hash = '#/home'; else route();
+}
+
+// ---- Edit / add profile
+function profileEditor(orig, isNew) {
+  document.querySelectorAll('.welcome').forEach(x => x.remove());
+  const d = Object.assign({}, orig);
+  let confirmDelete = false;
+  const w = document.createElement('div'); w.className = 'welcome profiles editor';
+  const grid = (list) => list.map(a => `<button class="avpick ${!d.avatarUrl && d.avatar === a[0] ? 'on' : ''}" data-av="${a[0]}">${avatarHTML(a[0], null, 60)}</button>`).join('');
+  const draw = () => {
+    w.innerHTML = `<div class="ebox">
+      <div class="etop"><button class="icon-btn" id="eback" aria-label="${T('Back')}">${ic('back')}</button><b>${T(isNew ? 'Add Profile' : 'Edit Profile')}</b></div>
+      <div class="epreview">${avatarHTML(d.avatar, d.avatarUrl, 120)}</div>
+      <label class="elabel" for="ename">${T('Name')}</label>
+      <input class="field" id="ename" maxlength="20" value="${esc(d.name)}" placeholder="${T('Profile name')}">
+      ${d.id !== MAIN ? `<div class="card erow"><div><b>${T('Use primary addons')}</b><small>${T("Share the main profile's addon setup instead of managing a separate list")}</small></div><button class="switch ${d.shareAddons ? 'on' : ''}" id="eshare" role="switch" aria-checked="${d.shareAddons}"></button></div>` : ''}
+      <label class="elabel" for="eurl">${T('Custom avatar URL')}</label>
+      <input class="field" id="eurl" type="url" value="${esc(d.avatarUrl || '')}" placeholder="https://…/avatar.gif">
+      <small class="dim">${T('Image or animated GIF link. Leave empty to use an avatar below.')}</small>
+      <div class="elabel">${T('Choose an avatar')}</div>
+      <small class="dim">${T('Animated')}</small><div class="avgrid">${grid(AVATARS_ANIMATED)}</div>
+      <small class="dim">${T('Classic')}</small><div class="avgrid">${grid(AVATARS_CLASSIC)}</div>
+      <div class="elabel">${T('Security')}</div>
+      <div class="card erow"><span class="pin-ic">${ic('lock')}</span><div><b>${T('Profile PIN')}</b><small>${T(d.pinHash ? 'This profile needs a 4-digit PIN to open' : 'Anyone can open this profile')}</small></div><button class="switch ${d.pinHash ? 'on' : ''}" id="epin" role="switch" aria-checked="${!!d.pinHash}"></button></div>
+      <button class="btn wgo olive" id="esave">${T('Save changes')}</button>
+      ${d.id !== MAIN && !isNew ? `<button class="linkbtn danger" id="edel">${T(confirmDelete ? 'Tap again to delete this profile' : 'Delete profile')}</button>` : ''}
+    </div>`;
+    const keep = () => { d.name = $('#ename', w).value; d.avatarUrl = $('#eurl', w).value.trim() || null; };
+    $('#eback', w).onclick = () => { w.remove(); profilesView(true); };
+    $('#eurl', w).onchange = () => { keep(); draw(); };
+    w.querySelectorAll('.avpick').forEach(b => b.onclick = () => { keep(); d.avatar = b.dataset.av; d.avatarUrl = null; draw(); });
+    $('#eshare', w)?.addEventListener('click', () => { keep(); d.shareAddons = !d.shareAddons; draw(); });
+    $('#epin', w).onclick = async () => {
+      keep();
+      if (!d.pinHash) { const pin = await pinPad({ title: d.name || T('Profile'), setNew: true }); if (pin) d.pinHash = await profilePinHash(d.id, pin); }
+      else if (!orig.pinHash) d.pinHash = null;
+      else if (await pinPad({ title: d.name, check: async p => (await profilePinHash(d.id, p)) === orig.pinHash })) d.pinHash = null;
+      draw();
+    };
+    $('#esave', w).onclick = () => {
+      keep();
+      const list = profiles(); const p = { id: d.id, name: d.name.trim() || T('Profile'), avatar: d.avatar, avatarUrl: d.avatarUrl, pinHash: d.pinHash, shareAddons: d.shareAddons };
+      const i = list.findIndex(x => x.id === p.id); if (i >= 0) list[i] = p; else list.push(p);
+      saveProfiles(list); w.remove(); profilesView(true);
+    };
+    $('#edel', w)?.addEventListener('click', () => {
+      keep();
+      if (!confirmDelete) { confirmDelete = true; draw(); return; }
+      saveProfiles(profiles().filter(x => x.id !== d.id));
+      delete CD[kS(d.id)]; delete CD[kL(d.id)]; delete CD[kF(d.id)]; dataChanged();
+      w.remove(); profilesView(true);
+    });
+  };
+  document.body.appendChild(w); draw();
 }
 
 // ============================================================================ settings
@@ -1028,7 +1301,11 @@ function settingsView() {
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   view.innerHTML = `<h1 class="page-title gutter">${T("Settings")}</h1><div class="gutter">
     <div class="set-h">${ic('home')}${T('Account')}</div>
-    <div class="card"><div class="set-row"><div><b>${esc(ACCOUNT?.email || '')}</b><small>${T('Your library, history and settings belong to this email')}</small></div><button class="btn tonal" id="signout" style="height:36px;padding:0 14px">${T('Switch account')}</button></div></div>
+    <div class="card">
+      <div class="set-row">${avatarHTML(activeProfile().avatar, activeProfile().avatarUrl, 48)}<div><b>${esc(activeProfile().name)}</b><small>${T(activeProfile().id === MAIN ? 'Main profile' : activeProfile().shareAddons ? "Uses the main profile's addons" : 'Own addon list')}</small></div><button class="btn tonal" id="pswitch" style="height:36px;padding:0 14px">${T('Switch profile')}</button></div>
+      <div class="set-row"><span class="pin-ic">${ic('home')}</span><div><b>${esc(SESSION?.email || '')}</b><small>${raw.get('lumio.lastSync', 0) ? T('Synced') + ' ' + new Date(raw.get('lumio.lastSync', 0)).toLocaleString() : T('Not synced yet')}</small></div></div>
+      <div class="set-row" style="gap:10px"><button class="btn tonal" id="psync" style="height:36px;padding:0 14px">${T('Sync now')}</button><button class="btn outline" id="signout" style="height:36px;padding:0 14px">${T('Sign out')}</button></div>
+    </div>
     <div class="set-h">${ic('lang')}${T('Language')}</div>
     <div class="card"><div class="set-row" style="display:block"><b>${T('App language')}</b><small>${T('Movie and show titles always stay in English')}</small>
       <div class="chips" style="padding:10px 0 0"><button class="chip ${S.lang !== 'ar' ? 'on' : ''}" data-lang="en">English</button><button class="chip ${S.lang === 'ar' ? 'on' : ''}" data-lang="ar">العربية</button></div></div></div>
@@ -1068,6 +1345,8 @@ function settingsView() {
     <p class="dim" style="font-size:12px;padding:24px 0">Lumio web • works best in Safari on iPhone. HDR & Dolby Vision play natively on supported iPhones for HLS/MP4 streams.</p>
   </div>`;
   $('#signout').onclick = signOut;
+  $('#pswitch').onclick = () => { PROFILE_CHOSEN = false; profilesView(); };
+  $('#psync').onclick = async () => { toast('Syncing…'); try { await cloudPush(true); await cloudPull(); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); settingsView(); } catch { toast('Network error'); } };
   view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
   const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
   toggle('amoled', 'amoled'); toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
@@ -1088,7 +1367,20 @@ function settingsView() {
 }
 
 // ============================================================================ boot
-loadAccountData();
+CD = raw.get(cacheKey(), {}) || {};
+if (SESSION) { PROFILE_ID = raw.get('lumio.activeProfile.' + SESSION.uid, MAIN); if (!profiles().some(p => p.id === PROFILE_ID)) PROFILE_ID = MAIN; }
+loadProfileData();
 applyTheme(); applyLang();
 if (location.hash === '#/play') history.replaceState(null, '', '#/home');
-if (ACCOUNT) route(); else welcomeView();
+if (!SESSION) loginView();
+else {
+  profilesView();   // "Who's watching?" on every launch
+  // Fetch the latest from the account (changes made on the phone app or another browser)
+  cloudPull().then(found => { if (found && !PROFILE_CHOSEN) { if (!profiles().some(p => p.id === PROFILE_ID)) PROFILE_ID = MAIN; loadProfileData(); applyTheme(); applyLang(); profilesView(); } }).catch(() => {});
+}
+// Coming back to the tab after a while → pick up changes from other devices
+let hiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); cloudPush(); return; }
+  if (SESSION && PROFILE_CHOSEN && Date.now() - hiddenAt > 60000 && !PLAYER.el) cloudPull().then(f => { if (f) { loadProfileData(); applyTheme(); route(); } }).catch(() => {});
+});
