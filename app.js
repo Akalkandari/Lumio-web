@@ -322,9 +322,9 @@ async function cloudPullNow(combine) {
 }
 async function cloudPushNow(force) {
   if (!SESSION) return;
-  if (!PULLED || !BASE) { if (await cloudPullNow()) loadProfileData(); return; }   // never upload before seeing the cloud
+  if (!PULLED || !BASE) { const b = JSON.stringify(CD); await cloudPullNow(); if (JSON.stringify(CD) !== b) applyCloudChanges(); return; }   // never upload before seeing the cloud
   if (!force && JSON.stringify(CD) === lastPushed) return;
-  if (!(await upload(CD, BASE))) { await cloudPullNow(); loadProfileData(); }
+  if (!(await upload(CD, BASE))) { await cloudPullNow(); applyCloudChanges(); }
 }
 const cloudPull = () => serial(cloudPullNow);
 const cloudPush = force => serial(() => cloudPushNow(force)).catch(() => { /* offline: retried on the next change */ });
@@ -1448,11 +1448,25 @@ if (!SESSION) loginView();
 else {
   profilesView();   // "Who's watching?" on every launch
   // Fetch the latest from the account (changes made on the phone app or another browser)
-  cloudPull().then(found => { if (found && !PROFILE_CHOSEN) { if (!profiles().some(p => p.id === PROFILE_ID)) PROFILE_ID = MAIN; loadProfileData(); applyTheme(); applyLang(); profilesView(); } }).catch(() => {});
+  refreshFromCloud();
 }
+/** Download the latest and, if anything changed, apply it right away (colours, language, profiles, history…). */
+async function refreshFromCloud() {
+  const before = JSON.stringify(CD);
+  try { await cloudPull(); } catch { return; }
+  if (JSON.stringify(CD) !== before) applyCloudChanges();
+}
+function applyCloudChanges() {
+  if (!profiles().some(p => p.id === PROFILE_ID)) { PROFILE_ID = MAIN; if (PROFILE_CHOSEN) PROFILE_CHOSEN = false; }
+  loadProfileData(); applyTheme(); applyLang();
+  if (!PROFILE_CHOSEN) { if (document.querySelector('.welcome.profiles')) profilesView(); }
+  else if (!PLAYER.el && !document.querySelector('.pop-bg, .sheet-bg, .welcome')) route();
+}
+// While the site is open, check for changes from other devices every minute
+setInterval(() => { if (SESSION && !document.hidden && !PLAYER.el) refreshFromCloud(); }, 60000);
 // Coming back to the tab after a while → pick up changes from other devices
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { hiddenAt = Date.now(); cloudPush(); return; }
-  if (SESSION && PROFILE_CHOSEN && Date.now() - hiddenAt > 60000 && !PLAYER.el) cloudPull().then(f => { if (f) { loadProfileData(); applyTheme(); route(); } }).catch(() => {});
+  if (SESSION && Date.now() - hiddenAt > 15000 && !PLAYER.el) refreshFromCloud();
 });
