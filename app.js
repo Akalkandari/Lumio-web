@@ -703,9 +703,15 @@ async function freeChannels(cat) {
 }
 const xtBase = s => { const b = s.server.trim().replace(/\/+$/, ''); return /^https?:\/\//.test(b) ? b : 'http://' + b; };
 const xtApi = (s, action) => `${xtBase(s)}/player_api.php?username=${encodeURIComponent(s.username)}&password=${encodeURIComponent(s.password)}${action ? '&action=' + action : ''}`;
-async function sourceChannels(src) {
+/** "…/get.php?username=X&password=Y" links are Xtream servers — read them through the API instead. */
+function xtFromLink(src) {
+  try { const u = new URL(src.url); if (!u.pathname.endsWith('get.php')) return null; const user = u.searchParams.get('username'), pass = u.searchParams.get('password');
+    return user && pass ? Object.assign({}, src, { kind: 'xtream', server: u.origin, username: user, password: pass }) : null; } catch { return null; }
+}
+async function sourceChannels(src0) {
+  const src = src0.kind === 'xtream' ? src0 : (xtFromLink(src0) || src0);
   return tvList('src:' + src.id + src.url + src.server + src.username, async () => {
-    if (src.kind !== 'xtream') return parseM3U(await fetchText(src.url));
+    if (src.kind !== 'xtream') { const list = parseM3U(await fetchText(src.url)); if (!list.length) throw new Error("That link didn't return a channel list"); return list; }
     const [cats, streams] = await Promise.all([getJSON(xtApi(src, 'get_live_categories')).catch(() => []), getJSON(xtApi(src, 'get_live_streams'))]);
     const names = Object.fromEntries((cats || []).map(c => [String(c.category_id), c.category_name]));
     return (streams || []).map(o => ({ name: o.name || 'Channel ' + o.stream_id, logo: /^http/.test(o.stream_icon || '') ? o.stream_icon : null,
@@ -819,14 +825,19 @@ function addPlaylistSheet() {
       if (xt && (!src.server || !src.username || !src.password)) { err.textContent = T('Fill in the server, username and password'); return; }
       if (!xt && !/^https?:\/\//.test(src.url)) { err.textContent = T('Paste the full playlist link (starts with http)'); return; }
       const go = $('#pl-save', bg); go.disabled = true; go.innerHTML = '<span class="mini-spin"></span>';
+      // Browsers can't read most IPTV servers (http:// links on a secure site, no cross-site permission).
+      // In that case we still save it — it syncs to the Lumio apps, which can read it.
+      const browserBlocked = e => e instanceof TypeError || /fetch|network|load failed|cors/i.test(e.message || '');
+      let note = 'Playlist added';
       try {
+        if (location.protocol === 'https:' && /^http:\/\//i.test(xt ? xtBase(src) : src.url)) throw new TypeError('mixed');
         if (xt) { const info = await getJSON(xtApi(src)); if (!info?.user_info) throw new Error("That server didn't answer like an Xtream Codes server"); if (String(info.user_info.auth) !== '1') throw new Error('Wrong username or password'); }
         else if (!(await sourceChannels(src)).length) throw new Error('That link has no channels');
       } catch (e) {
-        if (xt && /fetch|network|Failed/i.test(e.message)) { /* websites often can't read Xtream servers — save anyway, the apps can */ }
+        if (browserBlocked(e)) note = 'Saved — this provider only works in the Lumio app (phone / TV)';
         else { err.textContent = T(e.message || 'Network error'); go.disabled = false; go.textContent = T('Add'); return; }
       }
-      S.iptv = [...(S.iptv || []), src]; saveSettings(); bg.remove(); toast(T('Playlist added')); route();
+      S.iptv = [...(S.iptv || []), src]; saveSettings(); bg.remove(); toast(T(note)); route();
     };
   };
   draw(); document.body.appendChild(bg);
