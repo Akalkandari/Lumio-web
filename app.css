@@ -584,3 +584,4 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .add-pl-pop { padding: 20px; box-sizing: border-box; } .add-pl-pop .field { width: 100%; box-sizing: border-box; }
 .tile.add-pl { background: none !important; }
 .tile.tv .lbl b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 100%; }
+.tile.world { width: 190px; } .tile.world .lbl b { white-space: normal !important; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15; }

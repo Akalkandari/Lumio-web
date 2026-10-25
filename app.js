@@ -30,6 +30,19 @@ const SERVICES = [
   ['discovery', 'Discovery+', ['discovery+', 'discovery plus'], 520, '#1A73E8', '#051C40', 'orbit'],
   ['osn', 'OSN+', ['osn+', 'osn plus'], 629, '#E2007A', '#420024', 'heartbeat'],
 ].map(([key, name, aliases, id, c1, c2, motion]) => ({ key, name, aliases, ids: String(id), c1, c2, motion, logo: null, home: { shahid: 'SA', osn: 'AE' }[key] || null }));
+// Arabic & world catalogs (Discover → "Arabic & Turkish"); scene = animated Live TV scene
+const WORLD = [
+  ['arabic_series', 'Arabic Series', '🌙', 'ara', '#1E3A8A', '#0B1230', null, 'with_original_language=ar'],
+  ['gulf_series', 'Gulf & Kuwaiti Series', '🇰🇼', 'kw', '#007A3D', '#0B2A18', null, 'with_origin_country=KW|SA|AE|QA|BH|OM&with_original_language=ar'],
+  ['egyptian_series', 'Egyptian Series', '🇪🇬', 'eg', '#C8A24B', '#2E2208', null, 'with_origin_country=EG'],
+  ['syrian_series', 'Syrian & Lebanese Series', '🇱🇧', 'lb', '#00A651', '#2A0505', null, 'with_origin_country=SY|LB'],
+  ['turkish_series', 'Turkish Series', '🇹🇷', 'tr', '#E30A17', '#3A0507', null, 'with_original_language=tr'],
+  ['ramadan_series', 'Ramadan 2026', '🏮', 'ramadan', '#7C2D12', '#1F0B05', null, 'with_original_language=ar&first_air_date.gte=2026-02-10&first_air_date.lte=2026-03-25'],
+  ['korean_dramas', 'Korean Dramas', '🇰🇷', 'kr', '#1D4ED8', '#0A1440', null, 'with_original_language=ko&with_genres=18'],
+  ['arabic_movies', 'Arabic Movies', '🎬', 'movies', '#7C3AED', '#1E0B3A', 'with_original_language=ar', null],
+  ['egyptian_movies', 'Egyptian Movies', '🏜️', 'eg', '#B45309', '#2E1505', 'with_origin_country=EG', null],
+  ['turkish_movies', 'Turkish Movies', '🎞️', 'tr', '#B91C1C', '#2A0606', 'with_original_language=tr', null],
+].map(([key, name, emoji, scene, c1, c2, mq, tq]) => ({ key, name, emoji, scene, c1, c2, mq, tq }));
 const GENRES = [
   ['action', 'Action', 'with_genres=28', 'with_genres=10759', '#FF5A36', '#6B1300'],
   ['adventure', 'Adventure', 'with_genres=12', 'with_genres=10759', '#FFA62B', '#5C3300'],
@@ -501,6 +514,8 @@ function discoverSections() {
   <div class="rail gutter">${DISCOVER.map((d, i) => `<a class="tile discover" href="#/catalog/discover/${d.key}" style="${tileStyle(d.c1, d.c2, i)}"><span class="emoji" style="animation-delay:${i * .3}s">${d.emoji}</span><span class="lbl"><b>${esc(T(d.name))}</b><small>${esc(T(d.sub))}</small></span></a>`).join('')}</div>
   ${sectionH('Streaming Services', 'Browse every catalog')}
   <div class="rail gutter" id="services-rail">${servicesHTML(SERVICES.filter(s => s.logo))}</div>
+  ${sectionH('Arabic & Turkish', 'Series and films from the region and beyond')}
+  <div class="rail gutter">${WORLD.map((w, i) => `<a class="tile genre tv world" href="#/catalog/world/${w.key}" style="${tileStyle(w.c1, w.c2, i)}"><canvas data-scene="tv_${w.scene}" data-i="${i}"></canvas><span class="lbl"><b>${w.emoji} ${esc(T(w.name))}</b></span></a>`).join('')}</div>
   ${sectionH('Genres', 'Something for every mood')}
   <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>`;
 }
@@ -631,6 +646,7 @@ function libraryView(tab = 'watchlist') {
 function catalogInfo(kind, key) {
   if (kind === 'discover') { const d = DISCOVER.find(x => x.key === key); return d && { title: d.name, sub: d.sub, emoji: d.emoji, c1: d.c1, c2: d.c2, mq: '', tq: key === 'foryou' ? null : '', sortable: false }; }
   if (kind === 'service') { const s = SERVICES.find(x => x.key === key); return s && { title: s.name, sub: `Streaming now on ${s.name}`, service: s, c1: s.c1, c2: s.c2, sortable: true }; }
+  if (kind === 'world') { const w = WORLD.find(x => x.key === key); return w && { title: w.name, sub: w.tq ? 'Series everyone is watching' : 'The best films', scene: 'tv_' + w.scene, c1: w.c1, c2: w.c2, mq: w.mq, tq: w.tq, sortable: true }; }
   const g = GENRES.find(x => x.key === key); return g && { title: g.name, sub: `The best ${g.name.toLowerCase()} titles`, genre: g.key, c1: g.c1, c2: g.c2, mq: g.mq, tq: g.tq, sortable: true };
 }
 /** Actor / director page: photo, bio and every movie & series they're in. */
@@ -855,7 +871,7 @@ async function catalogView(kind, key, token) {
   if (token !== routeToken) return;
   const st = { type: info.mq == null ? 'tv' : 'movie', sort: 'popular', page: 0, items: [], loading: false, end: false };
   view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
-    <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.genre ? `<canvas id="bn-scene"></canvas>` : ''}
+    <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.genre || info.scene ? `<canvas id="bn-scene"></canvas>` : ''}
       <div class="ttl">${info.service ? logoHTML(info.service, 0, 58) : (!info.genre && info.emoji ? `<span style="font-size:44px" class="emoji-b">${info.emoji}</span>` : '')}
         <div><h1>${esc(info.service ? info.title : T(info.title))}</h1><p>${esc(info.service ? `${T('Streaming now on')} ${info.title}` : info.genre ? (S.lang === 'ar' ? `أفضل عناوين ${T(info.title)}` : info.sub) : T(info.sub))}</p></div></div></div>
     <div class="gutter">
@@ -863,7 +879,7 @@ async function catalogView(kind, key, token) {
       ${info.sortable ? `<div class="chips" id="sorts" style="padding-top:2px">${SORTS.map(([k, l], i) => `<button class="chip sm ${i ? '' : 'on'}" data-s="${k}">${T(l)}</button>`).join('')}</div>` : ''}
       <div class="grid" id="cgrid" style="padding-top:12px"></div><div id="cmore" style="height:1px"></div>
     </div>`;
-  if (info.genre) GenreScenes.attach($('#bn-scene'), info.genre, 0);
+  if (info.genre || info.scene) GenreScenes.attach($('#bn-scene'), info.genre || info.scene, 0);
   const grid = $('#cgrid');
   const load = async () => {
     if (st.loading || st.end) return; st.loading = true;

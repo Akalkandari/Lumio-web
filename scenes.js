@@ -2,7 +2,7 @@
    only canvases that are on screen are drawn (cheap on battery). */
 (function () {
   const TAU = Math.PI * 2;
-  const PERIOD = { tv_kw: 3200, tv_sa: 3200, tv_ae: 3200, tv_qa: 3200, tv_bh: 3200, tv_om: 3200, tv_eg: 3200, tv_iq: 3200, tv_jo: 3200, tv_lb: 3200, thriller: 1600, crime: 1200, music: 1400, reality: 1500, documentary: 5000, history: 5000, western: 5000, drama: 4200, war: 4200 };
+  const PERIOD = { tv_kw: 3200, tv_sa: 3200, tv_ae: 3200, tv_qa: 3200, tv_bh: 3200, tv_om: 3200, tv_eg: 3200, tv_iq: 3200, tv_jo: 3200, tv_lb: 3200, tv_tr: 3200, thriller: 1600, crime: 1200, music: 1400, reality: 1500, documentary: 5000, history: 5000, western: 5000, drama: 4200, war: 4200 };
   const items = new Set();
   const visible = new WeakSet();
   const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? visible.add(e.target) : visible.delete(e.target))) : null;
@@ -209,6 +209,36 @@
     tv_iq(c, w, h, v) { flag(c, w, h, v, (x, y) => (y > .42 && y < .58 && x > .3 && x < .7 && ((x * 20) | 0) % 2 === 0) ? '#007A3D' : y < 1 / 3 ? '#CE1126' : y < 2 / 3 ? '#FFFFFF' : '#000000'); },
     tv_jo(c, w, h, v) { flag(c, w, h, v, (x, y) => x < .5 * (1 - abs(2 * y - 1)) ? '#CE1126' : y < 1 / 3 ? '#000000' : y < 2 / 3 ? '#FFFFFF' : '#007A3D'); },
     tv_lb(c, w, h, v) { flag(c, w, h, v, (x, y) => (y < .25 || y > .75) ? '#ED1C24' : '#FFFFFF'); const cx = w * .5 + sin(v * TAU) * w * .01; for (let k = 0; k < 4; k++) { const y = h * (.28 + k * .12), s = w * (.07 + k * .035); c.beginPath(); c.moveTo(cx, y - h * .08); c.lineTo(cx - s, y + h * .06); c.lineTo(cx + s, y + h * .06); c.fillStyle = '#00A651'; c.fill(); } },
+    tv_tr(c, w, h, v) {
+      flag(c, w, h, v, () => '#E30A17');
+      const u = .36, dy = sin(v * TAU - u * 5.5) * h * .05 * (.35 + u), cx = w * u, cy = h * .5 + dy, r = h * .25;
+      circle(c, cx, cy, r, '#fff'); circle(c, cx + r * .25, cy, r * .8, '#E30A17');
+      const sx = cx + r * 1.05, sr = r * .36; c.beginPath();
+      for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5 + v * .6, rr = k % 2 ? sr * .42 : sr; const x = sx + cos(a) * rr, y = cy + sin(a) * rr; k ? c.lineTo(x, y) : c.moveTo(x, y); }
+      c.closePath(); c.fillStyle = '#fff'; c.fill();
+    },
+    tv_kr(c, w, h, v) {
+      c.fillStyle = '#F4F4F5'; c.fillRect(0, 0, w, h);
+      const cx = w * .5, cy = h * .5, r = h * .26; c.save(); c.translate(cx, cy); c.rotate(v * TAU);
+      c.beginPath(); c.arc(0, 0, r, Math.PI, 0); c.fillStyle = '#CD2E3A'; c.fill(); c.beginPath(); c.arc(0, 0, r, 0, Math.PI); c.fillStyle = '#0047A0'; c.fill();
+      circle(c, r / 2, 0, r / 2, '#CD2E3A'); circle(c, -r / 2, 0, r / 2, '#0047A0'); c.restore();
+      [[.22, .25, -33], [.78, .25, 33], [.22, .75, 33], [.78, .75, -33]].forEach(([x, y, a]) => { c.save(); c.translate(w * x, h * y); c.rotate(a * Math.PI / 180); c.fillStyle = '#111'; for (let k = -1; k <= 1; k++) c.fillRect(-h * .09, k * h * .045 - h * .015, h * .18, h * .03); c.restore(); });
+      const d = c.createLinearGradient(0, h * .45, 0, h); d.addColorStop(0, 'rgba(0,0,0,0)'); d.addColorStop(1, 'rgba(0,0,0,.45)'); c.fillStyle = d; c.fillRect(0, 0, w, h);
+    },
+    tv_ramadan(c, w, h, v) {
+      const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1F0B05'); g.addColorStop(1, '#3B1A0A'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      for (let k = 0; k < 10; k++) circle(c, w * ((k * .19 + .03) % 1), h * ((k * .29) % .45), h * .01, `rgba(255,255,255,${.3 + .7 * (sin(v * TAU * 2 + k * 1.9) + 1) / 2})`);
+      const mr = h * .12; circle(c, w * .18, h * .24, mr, '#FFE9A8'); circle(c, w * .18 + mr * .42, h * .24 - mr * .1, mr * .85, '#241006');
+      [[.55, 0], [.72, .35], [.88, .7]].forEach(([x, ph], k) => {
+        const tx = w * x, len = h * (.28 + .1 * k), bw = h * .13, bh = h * .22, glow = .6 + .4 * (sin(v * TAU * 3 + k) + 1) / 2;
+        c.save(); c.translate(tx, 0); c.rotate(sin(v * TAU + ph * TAU) * 10 * Math.PI / 180);
+        line(c, 0, 0, 0, len, '#D4A64A', 2); circle(c, 0, len + bh / 2, bh, `rgba(255,179,71,${.25 * glow})`);
+        c.fillStyle = '#D4A64A'; c.beginPath(); c.moveTo(-bw * .3, len); c.lineTo(bw * .3, len); c.lineTo(bw * .5, len + bh * .2); c.lineTo(-bw * .5, len + bh * .2); c.fill();
+        c.fillStyle = `rgba(255,197,107,${glow})`; c.fillRect(-bw / 2, len + bh * .2, bw, bh * .6);
+        for (let j = 0; j < 3; j++) line(c, -bw / 2 + j * bw / 2, len + bh * .2, -bw / 2 + j * bw / 2, len + bh * .8, '#8A5A1A', 1.5);
+        c.fillStyle = '#D4A64A'; c.beginPath(); c.moveTo(-bw * .5, len + bh * .8); c.lineTo(bw * .5, len + bh * .8); c.lineTo(0, len + bh); c.fill(); c.restore();
+      });
+    },
     tv_ara(c, w, h, v) {
       const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#0B1230'); g.addColorStop(1, '#1E3A8A'); c.fillStyle = g; c.fillRect(0, 0, w, h);
       for (let k = 0; k < 14; k++) circle(c, w * ((k * .137 + .05) % 1), h * ((k * .311) % .6), h * .012, `rgba(255,255,255,${.3 + .7 * (sin(v * TAU * 2 + k * 1.7) + 1) / 2})`);
