@@ -2,7 +2,7 @@
    only canvases that are on screen are drawn (cheap on battery). */
 (function () {
   const TAU = Math.PI * 2;
-  const PERIOD = { sp_football: 2400, sp_basketball: 2400, sp_nfl: 2400, sp_racing: 1400, sp_hockey: 2600, sp_baseball: 2400, sp_mma: 1600, sp_tennis: 2200, thriller: 1600, crime: 1200, music: 1400, reality: 1500, documentary: 5000, history: 5000, western: 5000, drama: 4200, war: 4200 };
+  const PERIOD = { tv_kw: 3200, tv_sa: 3200, tv_ae: 3200, tv_qa: 3200, tv_bh: 3200, tv_om: 3200, tv_eg: 3200, tv_iq: 3200, tv_jo: 3200, tv_lb: 3200, thriller: 1600, crime: 1200, music: 1400, reality: 1500, documentary: 5000, history: 5000, western: 5000, drama: 4200, war: 4200 };
   const items = new Set();
   const visible = new WeakSet();
   const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? visible.add(e.target) : visible.delete(e.target))) : null;
@@ -18,6 +18,38 @@
   function oval(c, x, y, w, h, fill, stroke) { c.beginPath(); c.ellipse(x + w / 2, y + h / 2, Math.max(w / 2, .1), Math.max(h / 2, .1), 0, 0, TAU); if (stroke) { c.strokeStyle = fill; c.lineWidth = stroke; c.stroke(); } else { c.fillStyle = fill; c.fill(); } }
   function heart(c, x, y, s, fill) { c.beginPath(); c.moveTo(x, y + s * .35); c.bezierCurveTo(x - s * .9, y - s * .25, x - s * .45, y - s * .95, x, y - s * .45); c.bezierCurveTo(x + s * .45, y - s * .95, x + s * .9, y - s * .25, x, y + s * .35); c.fillStyle = fill; c.fill(); }
   function sparkle(c, x, y, r, fill) { c.beginPath(); c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r); c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fillStyle = fill; c.fill(); }
+
+  const tri = x => { const f = x - Math.floor(x); return 1 - abs(2 * f - 1); };
+  const shade = (hex, k) => { const n = parseInt(hex.slice(1), 16); return `rgb(${(n >> 16 & 255) * k | 0},${(n >> 8 & 255) * k | 0},${(n & 255) * k | 0})`; };
+  /** Waving flag: a grid of tiles shifted and shaded by a travelling wave. */
+  function flag(c, w, h, v, colorAt) {
+    const cols = 30, rows = 12, cw = w / cols, rh = h / rows, amp = h * .05;
+    for (let i = 0; i < cols; i++) { const u = (i + .5) / cols, ph = v * TAU - u * 5.5, dy = sin(ph) * amp * (.35 + u), k = .82 + .18 * cos(ph);
+      for (let j = 0; j < rows; j++) { c.fillStyle = shade(colorAt(u, (j + .5) / rows), k); c.fillRect(i * cw, j * rh + dy - 1, cw + 1, rh + 2); } }
+    const g = c.createLinearGradient(w * (v * 2 - .6), 0, w * (v * 2 - .1), 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, 'rgba(255,255,255,.14)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    const d = c.createLinearGradient(0, h * .45, 0, h); d.addColorStop(0, 'rgba(0,0,0,0)'); d.addColorStop(1, 'rgba(0,0,0,.45)'); c.fillStyle = d; c.fillRect(0, 0, w, h);
+  }
+  /** Kuwait Towers: tall tower with two spheres, one with a single sphere, and the needle; tiles shimmer, beacon blinks. */
+  function towers(c, w, h, v) {
+    const sh = c.createLinearGradient(w * .45, 0, w, 0); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.55)'); c.fillStyle = sh; c.fillRect(0, 0, w, h);
+    const dark = '#0B1B2B', x0 = w * .74;
+    const sphere = (x, cy, r, seed) => { circle(c, x, cy, r, dark); circle(c, x, cy, r * .86, 'rgba(63,167,181,.85)');
+      for (let k = 0; k < 7; k++) { const a = k / 7 * TAU + v * TAU * .2; circle(c, x + cos(a) * r * .55, cy + sin(a) * r * .35, r * .09, `rgba(255,255,255,${.25 + .55 * (.5 + .5 * sin(v * TAU * 2 + k + seed))})`); } };
+    line(c, x0, h, x0, h * .06, dark, w * .012); sphere(x0, h * .5, h * .17, 0); sphere(x0, h * .27, h * .085, 3);
+    const x1 = x0 + w * .12; line(c, x1, h, x1, h * .3, dark, w * .01); sphere(x1, h * .58, h * .11, 5);
+    const x2 = x0 - w * .09; line(c, x2, h, x2, h * .38, dark, w * .007);
+    circle(c, x0, h * .06, h * .025, `rgba(255,59,59,${.3 + .7 * (sin(v * TAU * 3) + 1) / 2})`);
+  }
+  function burj(c, w, h, v) {
+    const sh = c.createLinearGradient(w * .5, 0, w, 0); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.5)'); c.fillStyle = sh; c.fillRect(0, 0, w, h);
+    const x = w * .82; [[.3, 1], [.22, .82], [.15, .62], [.09, .44], [.05, .28]].forEach(([wf, top]) => { const ww = w * wf * .35; c.fillStyle = 'rgba(221,230,240,.92)'; c.fillRect(x - ww / 2, h * (1 - top * .92), ww, h * top * .92); });
+    line(c, x, h * .12, x, -h * .05, '#DDE6F0', w * .006);
+    for (let k = 0; k < 6; k++) circle(c, x + (k % 2 - .5) * w * .02, h * (1 - ((v + k / 6) % 1) * .85), h * .012, 'rgba(255,224,138,.8)');
+  }
+  function pyramids(c, w, h, v) {
+    circle(c, w * (.62 + .04 * sin(v * TAU)), h * .32, h * .12, 'rgba(255,210,122,.9)');
+    [[.78, .42, '#D9A441'], [.62, .30, '#C8913A'], [.92, .24, '#B98232']].forEach(([cx, s, col]) => { const X = w * cx, S2 = h * s; c.beginPath(); c.moveTo(X - S2, h); c.lineTo(X, h - S2 * 1.1); c.lineTo(X + S2, h); c.fillStyle = col; c.fill(); c.beginPath(); c.moveTo(X, h - S2 * 1.1); c.lineTo(X + S2, h); c.lineTo(X + S2 * .25, h); c.fillStyle = 'rgba(0,0,0,.25)'; c.fill(); });
+  }
 
   const S = {
     action(c, w, h, v, s) {
@@ -166,77 +198,53 @@
       if (v < .6) circle(c, w - m - h * .25, m + h * .2, h * .07, '#FF3B30');
     },
     // ---- Live Sports (original drawings)
-    sp_football(c, w, h, v) {
-      for (let i = 0; i < 6; i += 2) { c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(w * i / 6, 0, w / 6, h); }
-      ring(c, w * .5, h * .55, h * .32, 'rgba(255,255,255,.12)', 1.5); line(c, w * .5, 0, w * .5, h, 'rgba(255,255,255,.12)', 1.5);
-      const x = w * (.1 + .8 * v), b = abs(sin(v * TAU * 2)), r = h * .12, y = h * .82 - b * h * .45;
-      oval(c, x - r, h * .86, r * 2, r * .5, `rgba(0,0,0,${.25 * (1 - b * .6)})`);
-      c.save(); c.translate(x, y); c.rotate(v * TAU * 2); circle(c, 0, 0, r, '#fff'); circle(c, 0, 0, r * .38, '#111');
-      for (let k = 0; k < 5; k++) { const a = k * TAU / 5; circle(c, cos(a) * r * .8, sin(a) * r * .8, r * .2, '#111'); } c.restore();
+    // ---------- Live TV: waving flags + landmarks, and category scenes
+    tv_kw(c, w, h, v) { flag(c, w, h, v, (x, y) => { const k = Math.min(1, x / .25); if (x <= .25 && y >= k / 3 && y <= 1 - k / 3) return '#000000'; return y < 1 / 3 ? '#007A3D' : y < 2 / 3 ? '#FFFFFF' : '#CE1126'; }); towers(c, w, h, v); },
+    tv_sa(c, w, h, v) { flag(c, w, h, v, () => '#006C35'); c.beginPath(); for (let i = 0; i <= 40; i++) { const x = w * (.25 + .55 * i / 40), y = h * .22 + sin(i * .9 + v * TAU) * h * .035 + sin(v * TAU - x / w * 5.5) * h * .03; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.strokeStyle = '#fff'; c.lineWidth = h * .035; c.lineCap = 'round'; c.stroke(); const sy = h * .38 + sin(v * TAU - 2.5) * h * .03; line(c, w * .3, sy, w * .75, sy, '#fff', h * .03); },
+    tv_ae(c, w, h, v) { flag(c, w, h, v, (x, y) => x < .25 ? '#CE1126' : y < 1 / 3 ? '#00732F' : y < 2 / 3 ? '#FFFFFF' : '#000000'); burj(c, w, h, v); },
+    tv_qa(c, w, h, v) { flag(c, w, h, v, (x, y) => x < .3 + .06 * tri(y * 9) ? '#FFFFFF' : '#8A1538'); },
+    tv_bh(c, w, h, v) { flag(c, w, h, v, (x, y) => x < .25 + .07 * tri(y * 5) ? '#FFFFFF' : '#CE1126'); },
+    tv_om(c, w, h, v) { flag(c, w, h, v, (x, y) => x < .33 ? '#DB161B' : y < .34 ? '#FFFFFF' : y > .66 ? '#008000' : '#DB161B'); },
+    tv_eg(c, w, h, v) { flag(c, w, h, v, (x, y) => y < 1 / 3 ? '#CE1126' : y < 2 / 3 ? '#FFFFFF' : '#000000'); pyramids(c, w, h, v); },
+    tv_iq(c, w, h, v) { flag(c, w, h, v, (x, y) => (y > .42 && y < .58 && x > .3 && x < .7 && ((x * 20) | 0) % 2 === 0) ? '#007A3D' : y < 1 / 3 ? '#CE1126' : y < 2 / 3 ? '#FFFFFF' : '#000000'); },
+    tv_jo(c, w, h, v) { flag(c, w, h, v, (x, y) => x < .5 * (1 - abs(2 * y - 1)) ? '#CE1126' : y < 1 / 3 ? '#000000' : y < 2 / 3 ? '#FFFFFF' : '#007A3D'); },
+    tv_lb(c, w, h, v) { flag(c, w, h, v, (x, y) => (y < .25 || y > .75) ? '#ED1C24' : '#FFFFFF'); const cx = w * .5 + sin(v * TAU) * w * .01; for (let k = 0; k < 4; k++) { const y = h * (.28 + k * .12), s = w * (.07 + k * .035); c.beginPath(); c.moveTo(cx, y - h * .08); c.lineTo(cx - s, y + h * .06); c.lineTo(cx + s, y + h * .06); c.fillStyle = '#00A651'; c.fill(); } },
+    tv_ara(c, w, h, v) {
+      const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#0B1230'); g.addColorStop(1, '#1E3A8A'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      for (let k = 0; k < 14; k++) circle(c, w * ((k * .137 + .05) % 1), h * ((k * .311) % .6), h * .012, `rgba(255,255,255,${.3 + .7 * (sin(v * TAU * 2 + k * 1.7) + 1) / 2})`);
+      const r = h * .14; circle(c, w * .78, h * .28, r, '#FFE9A8'); circle(c, w * .78 + r * .42 + sin(v * TAU) * r * .05, h * .28 - r * .12, r * .92, '#13245A');
+      c.beginPath(); c.moveTo(0, h); for (let i = 0; i <= 20; i++) c.lineTo(w * i / 20, h * .78 + sin(i * .6 + v * TAU * .5) * h * .05); c.lineTo(w, h); c.fillStyle = '#3A2A12'; c.fill();
     },
-    sp_basketball(c, w, h, v) {
-      const rx = w * .78, ry = h * .38; c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(rx + h * .12, ry - h * .3, 3, h * .38);
-      const sway = sin(v * TAU * 2) * (v > .55 && v < .8 ? 4 : .6);
-      for (let k = 0; k <= 4; k++) { const nx = rx - h * .12 + k * h * .06; line(c, nx, ry, rx + sway + (nx - rx) * .6, ry + h * .2, 'rgba(255,255,255,.35)', 1.5); }
-      line(c, rx - h * .13, ry, rx + h * .13, ry, '#FF6A00', 4);
-      const p = Math.min(v / .7, 1), x = w * .12 + (rx - w * .12) * p;
-      const y = v < .7 ? h * .85 - sin(p * Math.PI) * h * .75 + (ry - h * .85) * p * p * .6 : ry + (v - .7) / .3 * h * .55, r = h * .11;
-      c.save(); c.translate(x, y); c.rotate(v * TAU * 1.5); circle(c, 0, 0, r, '#FF7A1A'); line(c, -r, 0, r, 0, '#5A2600', 1.6); line(c, 0, -r, 0, r, '#5A2600', 1.6); c.restore();
+    tv_news(c, w, h, v) {
+      const cx = w * .72, cy = h * .42, r = h * .3; circle(c, cx, cy, r, 'rgba(255,255,255,.12)'); ring(c, cx, cy, r, 'rgba(255,255,255,.55)', 2);
+      for (let k = 0; k < 4; k++) { const ew = abs(cos(((v + k / 4) % 1) * Math.PI)) * r * 2; oval(c, cx - ew / 2, cy - r, ew, r * 2, 'rgba(255,255,255,.45)', 1.5); }
+      c.fillStyle = '#B91C1C'; c.fillRect(0, h * .8, w, h * .12);
+      for (let k = 0; k < 8; k++) { const x = (((k * .22 - v) % 1) + 1) % 1 * w * 1.3 - w * .15; c.fillStyle = 'rgba(255,255,255,.8)'; c.fillRect(x, h * .835, w * .12, h * .05); }
     },
-    sp_nfl(c, w, h, v) {
-      for (let k = 0; k <= 6; k++) { const lx = (((k / 6 - v) % 1) + 1) % 1 * w; line(c, lx, 0, lx, h, 'rgba(255,255,255,.12)', 2); }
-      const x = w * (.08 + .84 * v), y = h * .7 - sin(v * Math.PI) * h * .45;
-      for (let k = 0; k < 3; k++) line(c, x - h * (.2 + k * .08), y + (k - 1) * 4, x - h * (.4 + k * .12), y + (k - 1) * 5, `rgba(255,255,255,${.25 - k * .07})`, 2);
-      const bw = h * .36, bh = h * .21; c.save(); c.translate(x, y); c.rotate((-25 + v * 50) * Math.PI / 180);
-      oval(c, -bw / 2, -bh / 2, bw, bh, '#8B4513'); line(c, -bw * .18, 0, bw * .18, 0, '#fff', 2);
-      for (let k = -2; k <= 2; k++) line(c, k * bw * .07, -3, k * bw * .07, 3, '#fff', 1.6); c.restore();
+    tv_sports(c, w, h, v) {
+      line(c, w / 2, 0, w / 2, h, 'rgba(255,255,255,.25)', 2); ring(c, w / 2, h / 2, h * .25, 'rgba(255,255,255,.25)', 2);
+      const x = w * (.15 + .7 * tri(v)), y = h * .62 - abs(sin(v * TAU * 2)) * h * .35; oval(c, x - h * .08, h * .8, h * .16, h * .04, 'rgba(0,0,0,.25)');
+      circle(c, x, y, h * .09, '#fff'); circle(c, x, y, h * .03, '#000'); for (let k = 0; k < 5; k++) { const a = k / 5 * TAU + v * TAU * 2; circle(c, x + cos(a) * h * .062, y + sin(a) * h * .062, h * .018, '#000'); }
     },
-    sp_racing(c, w, h, v) {
-      const sq = h * .09; let i = 0;
-      for (let x = -sq * 2 + (v * sq * 2) % (sq * 2); x < w + sq; x += sq, i++) { c.fillStyle = 'rgba(255,255,255,.22)'; c.fillRect(x, h - sq * (i % 2 ? 1 : 2), sq, sq); }
-      for (let k = 0; k < 6; k++) { const ly = h * (.15 + k * .11), lx = w - ((v * 2.5 + k * .17) % 1) * w * 1.4; line(c, lx, ly, lx + w * .22, ly, 'rgba(255,255,255,.18)', 2); }
-      const X = w * .32 + sin(v * TAU) * w * .06, Y = h * .52 + sin(v * TAU * 8) * 1.2, cw = h * .85, ch = h * .17;
-      c.beginPath(); c.moveTo(X, Y + ch); c.lineTo(X + cw, Y + ch); c.lineTo(X + cw * .95, Y + ch * .35); c.lineTo(X + cw * .6, Y + ch * .2);
-      c.lineTo(X + cw * .45, Y - ch * .35); c.lineTo(X + cw * .3, Y - ch * .35); c.lineTo(X + cw * .22, Y + ch * .2); c.lineTo(X, Y + ch * .3); c.closePath(); c.fillStyle = '#FF2D2D'; c.fill();
-      c.fillStyle = '#fff'; c.fillRect(X - cw * .04, Y - ch * .1, cw * .06, ch * .5);
-      [.2, .8].forEach(f => { const cx = X + cw * f, cy = Y + ch * 1.05; circle(c, cx, cy, ch * .55, '#111'); const a = v * TAU * 6; line(c, cx - cos(a) * ch * .35, cy - sin(a) * ch * .35, cx + cos(a) * ch * .35, cy + sin(a) * ch * .35, '#888', 2); });
+    tv_kids(c, w, h, v) { const cols = ['#FF5A5F', '#3B82F6', '#FFD43B', '#22C55E', '#A855F7']; for (let k = 0; k < 5; k++) { const p = (v + k * .21) % 1, x = w * (.45 + k * .11) + sin(p * TAU + k) * w * .03, y = h * (1.15 - p * 1.3); line(c, x, y + h * .1, x + sin(p * TAU * 2) * 6, y + h * .3, 'rgba(255,255,255,.5)', 1.5); oval(c, x - h * .07, y - h * .1, h * .14, h * .2, cols[k]); circle(c, x - h * .03, y - h * .05, h * .02, 'rgba(255,255,255,.45)'); } },
+    tv_movies(c, w, h, v) {
+      const y0 = h * .22, sh = h * .42, fw = sh * 1.1; c.fillStyle = 'rgba(0,0,0,.7)'; c.fillRect(0, y0, w, sh);
+      let x = -fw + (v * fw * 3) % fw, k = 0; while (x < w) { c.fillStyle = `rgba(124,58,237,${.35 + .12 * (k % 3)})`; c.fillRect(x + 6, y0 + sh * .18, fw - 12, sh * .64); for (let j = 0; j < 4; j++) { c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(x + j * fw / 4 + 4, y0 + 3, fw / 8, sh * .08); c.fillRect(x + j * fw / 4 + 4, y0 + sh * .9, fw / 8, sh * .08); } x += fw; k++; }
     },
-    sp_hockey(c, w, h, v) {
-      const g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,.12)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, w, h);
-      line(c, w * .5, 0, w * .5, h, 'rgba(255,77,77,.4)', 2.5); line(c, w * .25, 0, w * .25, h, 'rgba(77,124,255,.35)', 2); line(c, w * .75, 0, w * .75, h, 'rgba(77,124,255,.35)', 2);
-      const p = (sin(v * TAU - Math.PI / 2) + 1) / 2, x = w * (.15 + .7 * p), y = h * .62, dir = cos(v * TAU - Math.PI / 2) > 0 ? 1 : -1;
-      for (let k = 0; k < 5; k++) oval(c, x - dir * k * h * .07 - h * .08, y - h * .03, h * .16, h * .06, `rgba(0,0,0,${.12 - k * .02})`);
-      oval(c, x - h * .09, y - h * .04, h * .18, h * .08, '#0d0d0d'); oval(c, x - h * .09, y - h * .055, h * .18, h * .07, '#333');
+    tv_series(c, w, h, v) { const l = w * .55, t = h * .18, sw = w * .36, sh = h * .46, bars = ['#fff', '#FFD43B', '#22D3EE', '#22C55E', '#DB2777', '#EF4444', '#3B82F6'], sft = (v * bars.length) | 0; c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(l - 6, t - 6, sw + 12, sh + 12); bars.forEach((_, i) => { c.fillStyle = bars[(i + sft) % bars.length]; c.fillRect(l + i * sw / bars.length, t, sw / bars.length + 1, sh); }); c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(l, t + sh * ((v * 3) % 1), sw, sh * .06); },
+    tv_music(c, w, h, v) { const n = 9, bw = w * .5 / n; for (let i = 0; i < n; i++) { const amp = .25 + .65 * abs(sin(v * TAU * 2 + i * .8) * cos(v * TAU + i * .3)); c.fillStyle = i % 2 ? '#EC4899' : '#FFC2E0'; c.fillRect(w * .45 + i * bw * 1.15, h * (.8 - amp * .6), bw, h * amp * .6); } },
+    tv_religious(c, w, h, v) {
+      for (let k = 0; k < 9; k++) circle(c, w * ((k * .17 + .05) % 1), h * ((k * .23) % .4 + .05), h * .012, `rgba(255,255,255,${.3 + .7 * (sin(v * TAU * 2 + k * 1.3) + 1) / 2})`);
+      const r = h * .1; circle(c, w * .2, h * .25, r, '#FFE9A8'); circle(c, w * .2 + r * .4, h * .25 - r * .1, r * .85, '#0F766E');
+      const cx = w * .7, col = '#042420'; c.beginPath(); c.arc(cx, h * .58, h * .2, Math.PI, 0); c.fillStyle = col; c.fill(); c.fillRect(cx - h * .22, h * .58, h * .44, h * .42); c.fillRect(cx + h * .3, h * .22, h * .06, h * .78); circle(c, cx + h * .33, h * .22, h * .045, col);
+      c.fillStyle = `rgba(255,210,122,${.4 + .4 * (sin(v * TAU) + 1) / 2})`; c.fillRect(cx - h * .04, h * .72, h * .08, h * .14);
     },
-    sp_baseball(c, w, h, v) {
-      c.beginPath(); c.moveTo(w * .5, h * .2); c.lineTo(w * .7, h * .55); c.lineTo(w * .5, h * .9); c.lineTo(w * .3, h * .55); c.closePath(); c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.stroke();
-      const bx = w * .82, by = h * .62, sw = Math.min(Math.max((v - .42) / .18, 0), 1);
-      c.save(); c.translate(bx, by); c.rotate((-70 + sw * 140) * Math.PI / 180); line(c, 0, 0, -h * .55, 0, '#C08A4A', 7); line(c, 0, 0, -h * .12, 0, '#6B4423', 4); c.restore();
-      let x, y; if (v < .5) { const p = v / .5; x = w * .1 + (bx - h * .4 - w * .1) * p; y = h * .55 - sin(p * Math.PI) * h * .08; }
-      else { const p = (v - .5) / .5; x = bx - h * .4 - p * w * .75; y = h * .6 - sin(p * Math.PI * .9) * h * .55; }
-      const r = h * .09; if (v > .48 && v < .56) ring(c, x, y, r * 2.2, 'rgba(255,255,255,.5)', 2);
-      circle(c, x, y, r, '#fff'); c.beginPath(); c.arc(x - r * .6, y, r, -.9, .9); c.strokeStyle = '#E53935'; c.lineWidth = 1.5; c.stroke(); c.beginPath(); c.arc(x + r * .6, y, r, Math.PI - .9, Math.PI + .9); c.stroke();
-    },
-    sp_mma(c, w, h, v) {
-      c.beginPath(); for (let k = 0; k <= 8; k++) { const a = TAU * k / 8 + Math.PI / 8, px = w * .5 + cos(a) * h * .55, py = h * .5 + sin(a) * h * .45; k ? c.lineTo(px, py) : c.moveTo(px, py); }
-      c.strokeStyle = 'rgba(255,255,255,.12)'; c.lineWidth = 2; c.stroke();
-      const L = Math.max(0, sin(v * TAU)), R = Math.max(0, -sin(v * TAU)), r = h * .17;
-      const glove = (x, y, col, f) => { c.fillStyle = col; c.beginPath(); c.roundRect ? c.roundRect(x - r, y - r * .85, r * 2, r * 1.7, r * .8) : c.rect(x - r, y - r * .85, r * 2, r * 1.7); c.fill();
-        c.fillStyle = 'rgba(255,255,255,.85)'; c.fillRect(x + f * r * .55 - r * .12, y - r * .8, r * .24, r * 1.6); };
-      glove(w * .18 + L * w * .22, h * .55, '#E11D1D', -1); glove(w * .82 - R * w * .22, h * .45, '#1D4ED8', 1);
-      const hit = Math.max(L, R); if (hit > .85) { const s = (hit - .85) / .15; for (let k = 0; k < 8; k++) { const a = TAU * k / 8; line(c, w * .5 + cos(a) * r * .5, h * .5 + sin(a) * r * .5, w * .5 + cos(a) * r * (.8 + s), h * .5 + sin(a) * r * (.8 + s), '#FFD43B', 3); } }
-    },
-    sp_tennis(c, w, h, v) {
-      line(c, 0, h * .88, w, h * .88, 'rgba(255,255,255,.18)', 2); line(c, w * .5, h * .5, w * .5, h * .88, 'rgba(255,255,255,.6)', 2);
-      for (let k = 0; k <= 4; k++) line(c, w * .5 - 6, h * (.55 + k * .07), w * .5 + 6, h * (.55 + k * .07), 'rgba(255,255,255,.25)', 1);
-      const p = (v * 2) % 1, right = v < .5, sx = right ? w * .08 : w * .92, ex = right ? w * .92 : w * .08, x = sx + (ex - sx) * p;
-      const y = p < .65 ? h * .5 - sin(p / .65 * Math.PI) * h * .35 + (h * .38) * (p / .65) * (p / .65) : h * .88 - sin((p - .65) / .35 * Math.PI) * h * .4;
-      circle(c, x, y, h * .075, '#D7F542');
-      if (p < .12 || p > .92) { const hx = p < .12 ? sx : ex, r = h * .075; oval(c, hx - r * 1.6, h * .42 - r * 2.2, r * 3.2, r * 4.4, 'rgba(255,255,255,.9)', 2.5); line(c, hx, h * .42 + r * 2.2, hx, h * .42 + r * 4.2, '#333', 4); }
-    },
-    kids(c, w, h, v) {
-      ['#FF6B6B', '#FFD93D', '#6BCB77'].forEach((col, i) => { const hop = abs(sin((v + i * .22) * Math.PI * 2)), r = h * .12; circle(c, w * (.55 + i * .15), h * .85 - r - hop * h * .45, r, col); });
-    },
+    tv_documentary(c, w, h, v) { circle(c, w * .7, h * (.5 - .15 * sin(v * Math.PI)), h * .12, '#FFD27A'); c.beginPath(); c.moveTo(w * .35, h); c.lineTo(w * .6, h * .45); c.lineTo(w * .85, h); c.fillStyle = '#0B3A52'; c.fill(); c.beginPath(); c.moveTo(w * .55, h); c.lineTo(w * .82, h * .35); c.lineTo(w * 1.1, h); c.fillStyle = '#07263A'; c.fill(); const bx = w * (.3 + .6 * v), by = h * .25 + sin(v * TAU * 2) * h * .04, f = sin(v * TAU * 6) * h * .03; line(c, bx - h * .05, by - f, bx, by, '#fff', 2); line(c, bx, by, bx + h * .05, by - f, '#fff', 2); },
+    tv_entertainment(c, w, h, v) { [.55, .9].forEach((x, k) => { const a = sin(v * TAU + k * 2) * .25, tx = w * x; c.beginPath(); c.moveTo(tx, h); c.lineTo(tx + (a - .18) * h * 2, -h * .1); c.lineTo(tx + (a + .18) * h * 2, -h * .1); const g = c.createLinearGradient(0, h, 0, 0); g.addColorStop(0, 'rgba(255,255,255,.28)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fill(); }); for (let k = 0; k < 8; k++) { const p = (v * 1.5 + k * .13) % 1; circle(c, w * (.5 + .45 * ((k * .37) % 1)), h * (.7 - p * .6), h * .015 * (1 + p), `rgba(255,224,138,${1 - p})`); } },
+    tv_general(c, w, h, v) { const cx = w * .72, cy = h * .62; c.save(); c.translate(cx, cy); c.rotate(-Math.PI / 6); c.beginPath(); c.arc(0, 0, h * .2, 0, Math.PI); c.fillStyle = 'rgba(255,255,255,.85)'; c.fill(); c.restore(); line(c, cx, cy, cx + h * .12, cy - h * .2, 'rgba(255,255,255,.85)', 3); for (let k = 0; k < 3; k++) { const p = (v + k / 3) % 1; c.beginPath(); c.arc(cx + h * .12, cy - h * .2, Math.max(.1, h * .3 * p), -Math.PI * .45, -Math.PI * .05); c.strokeStyle = `rgba(255,255,255,${(1 - p) * .7})`; c.lineWidth = 2.5; c.stroke(); } },
+    tv_business(c, w, h, v) { const pts = [.7, .62, .66, .5, .55, .38, .42, .25], n = Math.min(1, v * 1.2) * (pts.length - 1); c.beginPath(); for (let i = 0; i <= (n | 0); i++) { const x = w * (.4 + .55 * i / (pts.length - 1)), y = h * pts[i]; i ? c.lineTo(x, y) : c.moveTo(x, y); } c.strokeStyle = '#86EFAC'; c.lineWidth = 3; c.stroke(); for (let i = 0; i < 6; i++) { const bh = h * (.12 + .08 * i) * (.8 + .2 * sin(v * TAU + i)); c.fillStyle = 'rgba(255,255,255,.15)'; c.fillRect(w * (.42 + i * .09), h * .9 - bh, w * .05, bh); } },
+    tv_culture(c, w, h, v) { const cx = w * .75, cy = h * .5, r = h * .32; c.save(); c.translate(cx, cy); c.rotate(v * Math.PI / 2); for (let k = 0; k < 2; k++) { c.save(); c.rotate(k * Math.PI / 4); c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 2.5; c.strokeRect(-r * .7, -r * .7, r * 1.4, r * 1.4); c.restore(); } c.restore(); ring(c, cx, cy, r * .45, 'rgba(255,255,255,.35)', 2); circle(c, cx, cy, r * .12, `rgba(233,213,255,${.6 + .3 * sin(v * TAU)})`); },
+    tv_playlist(c, w, h, v) { const cx = w * .75, cy = h * .7; circle(c, cx, cy, h * .04, '#fff'); for (let k = 0; k < 3; k++) { const p = (v + k / 3) % 1; c.beginPath(); c.arc(cx, cy, Math.max(.1, h * .5 * p), Math.PI * 1.22, Math.PI * 1.78); c.strokeStyle = `rgba(255,255,255,${(1 - p) * .8})`; c.lineWidth = 3; c.stroke(); } },
   };
 
   function frame(now) {
