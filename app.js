@@ -17,7 +17,7 @@ const ACCENTS = [
 const TITLES = [['white', 'White', '#FFFFFF'], ['cinema', 'Cinema red', '#E3262F'], ['gold', 'Classic gold', '#F5C451'], ['cream', 'Cream', '#F3E5C0'], ['accent', 'Theme colour', null]];
 const ICONS = [['classic', 'Classic', '#8A9B35', '#2E3A0E'], ['cinema', 'Cinema red', '#E3262F', '#5A0B0F'], ['violet', 'Violet', '#7C5CFF', '#2A1A66'],
   ['ocean', 'Ocean', '#2D8CFF', '#0A2A5C'], ['emerald', 'Emerald', '#10B981', '#064E3B'], ['gold', 'Gold', '#F5B700', '#5C4300'], ['midnight', 'Midnight', '#3A3A46', '#0B0B0F']];
-const AR_FONTS = [['cinema', 'Classic cinema', 'سينما زمان', '"Lumio Cinema"'], ['clear', 'Clear', 'واضح ومريح', '"Lumio Clear"'], ['ruqaa', 'Ruqʿah', 'خط الرقعة', '"Lumio Ruqaa"']];
+const AR_FONTS = [['cinema', 'Classic cinema', 'سينما زمان', "'Lumio Cinema'"], ['clear', 'Easy to read', 'واضح ومريح', "'Lumio Clear'"], ['ruqaa', 'Ruqʿah', 'خط الرقعة', "'Lumio Ruqaa'"]];
 const SERVICES = [
   ['netflix', 'Netflix', ['netflix'], 8, '#E50914', '#5A0408', 'heartbeat'],
   ['disney', 'Disney+', ['disney plus', 'disney+'], 337, '#1B3FD1', '#0A1A5C', 'orbit'],

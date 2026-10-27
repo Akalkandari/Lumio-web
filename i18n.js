@@ -430,6 +430,7 @@ window.LUMIO_AR = {
 "Countries": "الدول",
 "Categories": "الفئات",
 "Sections": "الأقسام",
+"Easy to read": "سهل القراءة",
 "Theme, title colour, Arabic font and app icon": "الثيم ولون العناوين والخط العربي وأيقونة التطبيق",
 "Classic cinema look": "طابع السينما الكلاسيكية",
 "Red titles, film-poster Arabic lettering, red theme and icon — in one tap": "عناوين حمراء وخط أفيشات السينما وثيم وأيقونة حمراء — بلمسة واحدة",
