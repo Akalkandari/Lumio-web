@@ -350,7 +350,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
    so English movie titles keep the regular system font. */
 @font-face { font-family: "Lumio Ruqaa"; src: url("fonts/ArefRuqaa-Regular-arabic.ttf") format("truetype"); font-weight: 400 500; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
 @font-face { font-family: "Lumio Ruqaa"; src: url("fonts/ArefRuqaa-Bold-arabic.ttf") format("truetype"); font-weight: 600 900; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
-[dir=rtl] { --font: "Lumio Ruqaa", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --display: "Lumio Ruqaa", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+/* Classic cinema: Rakkas, lettering inspired by old Egyptian film posters; Clear: Tajawal (both OFL, Arabic-only subsets) */
+@font-face { font-family: "Lumio Cinema"; src: url("fonts/Rakkas-Regular-arabic.ttf") format("truetype"); font-weight: 100 900; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: "Lumio Clear"; src: url("fonts/Tajawal-Regular-arabic.ttf") format("truetype"); font-weight: 100 450; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: "Lumio Clear"; src: url("fonts/Tajawal-Medium-arabic.ttf") format("truetype"); font-weight: 451 599; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: "Lumio Clear"; src: url("fonts/Tajawal-Bold-arabic.ttf") format("truetype"); font-weight: 600 749; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+@font-face { font-family: "Lumio Clear"; src: url("fonts/Tajawal-ExtraBold-arabic.ttf") format("truetype"); font-weight: 750 1000; font-display: swap; unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+200C-200F; }
+/* Arabic font (Settings → Appearance): cinema (default) = poster headings + clear text; clear; ruqaa */
+[dir=rtl] { --font: "Lumio Clear", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --display: "Lumio Cinema", "Lumio Clear", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+[dir=rtl]:not(.af-clear):not(.af-ruqaa) :is(h1, h2, h3) { font-synthesis: none; letter-spacing: 0; }
+[dir=rtl].af-clear { --display: "Lumio Clear", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
+[dir=rtl].af-ruqaa { --font: "Lumio Ruqaa", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --display: "Lumio Ruqaa", -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; }
 [dir=rtl] body { font-size: 16px; }
 [dir=rtl] input, [dir=rtl] button { font-family: var(--font); }
 [dir=rtl] .tile, [dir=rtl] .ep, [dir=rtl] .stream, [dir=rtl] .opt { text-align: right; }
@@ -585,3 +595,29 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .tile.add-pl { background: none !important; }
 .tile.tv .lbl b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 100%; }
 .tile.world { width: 190px; } .tile.world .lbl b { white-space: normal !important; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15; }
+
+/* ---------------- Appearance: title colour, app icon tiles, font cards */
+:root { --title: #FFFFFF; }
+.page-title, .section-h h2, .sports-head h1, .ap-preview h2 { color: var(--title); transition: color .4s; }
+.ap-row { display: flex; align-items: center; gap: 14px; width: 100%; text-align: start; }
+.ap-row .ap-ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), var(--title)); color: #fff; flex: none; }
+.ap-row .ap-ic svg { width: 22px; height: 22px; }
+.ap-row .chev { margin-inline-start: auto; color: var(--dim); }
+.ap-cinema { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px; border-radius: 18px; background: #1A0507; border: 1px solid rgba(227,38,47,.4); text-align: start; }
+.ap-cinema.on { border: 2px solid #E3262F; }
+.ap-cinema b { color: #E3262F; font-size: 17px; font-weight: 800; display: block; }
+.ap-fonts { display: grid; gap: 10px; padding-top: 14px; }
+.ap-font { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 14px; background: var(--s2, #1E1E28); border: 2px solid rgba(255,255,255,.08); text-align: start; width: 100%; }
+.ap-font.on { border-color: var(--accent); }
+.ap-font .smp { font-size: 22px; display: block; direction: rtl; }
+.ap-icons { display: flex; flex-wrap: wrap; gap: 14px; padding-top: 14px; }
+.ap-icon { width: 64px; display: grid; justify-items: center; gap: 4px; font-size: 11px; color: var(--dim); }
+.ap-icon img { width: 58px; height: 58px; border-radius: 16px; transition: transform .3s cubic-bezier(.3,1.6,.5,1), box-shadow .3s; }
+.ap-icon.on img { transform: scale(1.06); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5.5px #fff; }
+.ap-icon.on { color: #fff; }
+.ap-preview { display: flex; align-items: center; gap: 16px; padding: 16px; }
+.ap-preview img { width: 56px; height: 56px; border-radius: 14px; }
+.ap-preview h2 { font-size: 22px; }
+.ap-preview .bar { width: 36px; height: 3px; border-radius: 3px; background: var(--accent); margin: 6px 0; }
+.ap-preview .pill { display: inline-block; padding: 6px 14px; border-radius: 99px; font-size: 13px; font-weight: 700; background: var(--accent); color: #fff; margin-inline-end: 8px; }
+.ap-preview .pill.alt { background: rgba(255,255,255,.12); font-weight: 500; }

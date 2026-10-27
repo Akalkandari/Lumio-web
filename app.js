@@ -10,9 +10,14 @@ const BUILT_IN_ADDONS = [
   { url: 'https://subdl.strem.top/c3ViZGxfM1ZZYVFfcUVoa2d1a0hOZlBlSXBDTFVHNWczS0NfRTF1bFBJMzI2M2lOQS9BUi9oaUV4Y2x1ZGUv/manifest.json', name: 'SubDL Subtitles', resources: ['subtitles'], builtIn: true },
 ];
 const ACCENTS = [
-  ['violet', 'Violet', '#7C5CFF'], ['ocean', 'Ocean', '#2D8CFF'], ['emerald', 'Emerald', '#10B981'], ['ruby', 'Ruby', '#FF3B5C'],
+  ['violet', 'Violet', '#7C5CFF'], ['cinema', 'Cinema', '#E3262F'], ['ocean', 'Ocean', '#2D8CFF'], ['emerald', 'Emerald', '#10B981'], ['ruby', 'Ruby', '#FF3B5C'],
   ['sunset', 'Sunset', '#FF7A1A'], ['gold', 'Gold', '#F5B700'], ['sakura', 'Sakura', '#FF5FA8'],
 ];
+// Settings → Appearance (same choices as the phone and TV apps; saved in your account)
+const TITLES = [['white', 'White', '#FFFFFF'], ['cinema', 'Cinema red', '#E3262F'], ['gold', 'Classic gold', '#F5C451'], ['cream', 'Cream', '#F3E5C0'], ['accent', 'Theme colour', null]];
+const ICONS = [['classic', 'Classic', '#8A9B35', '#2E3A0E'], ['cinema', 'Cinema red', '#E3262F', '#5A0B0F'], ['violet', 'Violet', '#7C5CFF', '#2A1A66'],
+  ['ocean', 'Ocean', '#2D8CFF', '#0A2A5C'], ['emerald', 'Emerald', '#10B981', '#064E3B'], ['gold', 'Gold', '#F5B700', '#5C4300'], ['midnight', 'Midnight', '#3A3A46', '#0B0B0F']];
+const AR_FONTS = [['cinema', 'Classic cinema', 'سينما زمان', '"Lumio Cinema"'], ['clear', 'Clear', 'واضح ومريح', '"Lumio Clear"'], ['ruqaa', 'Ruqʿah', 'خط الرقعة', '"Lumio Ruqaa"']];
 const SERVICES = [
   ['netflix', 'Netflix', ['netflix'], 8, '#E50914', '#5A0408', 'heartbeat'],
   ['disney', 'Disney+', ['disney plus', 'disney+'], 337, '#1B3FD1', '#0A1A5C', 'orbit'],
@@ -163,6 +168,7 @@ function fromApp(a) {
   return {
     tmdbKey: a.tmdbKey || '', region: a.region || 'US',
     accent: a.accentPreset || 'violet', customAccent: longToHex(a.customAccent ?? 0xFF7C5CFF), amoled: !!a.amoled,
+    titleColor: a.titleColor || 'white', arabicFont: a.arabicFont || 'cinema', iconColor: a.iconColor || 'classic',
     skipIntro: (a.skipIntro || 'BUTTON').toLowerCase(), skipRecap: (a.skipRecap || 'BUTTON').toLowerCase(), skipCredits: (a.skipCredits || 'BUTTON').toLowerCase(),
     skipNudity: !!a.skipNudity, subLang: a.subtitleLanguage || 'en', subScale: a.subtitleScale ?? 1, subBg: a.subtitleBackground ?? true,
     autoNext: a.autoPlayNext ?? true, lang: a.language || raw.get('lumio.deviceLang', 'en'),
@@ -174,6 +180,7 @@ function fromApp(a) {
 function toApp(w, base) {
   return Object.assign({}, base, {
     tmdbKey: w.tmdbKey, region: w.region, accentPreset: w.accent, customAccent: hexToLong(w.customAccent), amoled: !!w.amoled,
+    titleColor: w.titleColor || 'white', arabicFont: w.arabicFont || 'cinema', iconColor: w.iconColor || 'classic',
     skipIntro: w.skipIntro.toUpperCase(), skipRecap: w.skipRecap.toUpperCase(), skipCredits: w.skipCredits.toUpperCase(), skipNudity: !!w.skipNudity,
     subtitleLanguage: w.subLang, subtitleScale: w.subScale, subtitleBackground: w.subBg, autoPlayNext: w.autoNext, language: w.lang,
     iptvSources: w.iptv || [], favChannels: w.favs || [], recentChannels: w.recents || [],
@@ -358,9 +365,29 @@ function updateLib(type, id, fn) {
 const isContinue = e => e && e.pos > 30000 && e.dur > 0 && e.pos / e.dur < .95;
 const progressOf = e => e && e.dur > 0 ? Math.min(1, e.pos / e.dur) : 0;
 
+/** The Lumio icon (gradient square + play mark) in one of the Appearance colours, as a PNG data URL. */
+function iconURL(key, size = 180) {
+  const p = ICONS.find(x => x[0] === key) || ICONS[0];
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, size, size);
+  gr.addColorStop(0, p[2]); gr.addColorStop(1, p[3]); g.fillStyle = gr; g.fillRect(0, 0, size, size);
+  const w = size / 108; g.fillStyle = '#fff'; g.beginPath(); g.moveTo(44 * w, 36 * w); g.lineTo(74 * w, 54 * w); g.lineTo(44 * w, 72 * w); g.closePath(); g.fill();
+  return c.toDataURL('image/png');
+}
+const titleHex = () => { const t = TITLES.find(x => x[0] === S.titleColor) || TITLES[0]; return t[2] || getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#FFFFFF'; };
 function applyTheme() {
   const a = ACCENTS.find(x => x[0] === S.accent);
   document.documentElement.style.setProperty('--accent', a ? a[2] : S.customAccent);
+  document.documentElement.style.setProperty('--title', titleHex());
+  const root = document.documentElement.classList;
+  root.toggle('af-clear', S.arabicFont === 'clear'); root.toggle('af-ruqaa', S.arabicFont === 'ruqaa');
+  // App icon colour: browser tab icon + iPhone home-screen icon (for new "Add to Home Screen")
+  if (S.iconColor && S.iconColor !== 'classic') {
+    for (const [rel, size] of [['icon', 64], ['apple-touch-icon', 180]]) {
+      let l = document.querySelector(`link[rel="${rel}"]`); if (!l) { l = document.createElement('link'); l.rel = rel; document.head.appendChild(l); }
+      l.href = iconURL(S.iconColor, size);
+    }
+  } else { const l = document.querySelector('link[rel="apple-touch-icon"]'); if (l) l.href = 'icons/apple-touch-icon.png'; document.querySelector('link[rel="icon"]')?.remove(); }
   document.documentElement.classList.toggle('amoled', !!S.amoled);
   const bg = S.amoled ? '#000000' : '#0B0B0F';
   document.querySelector('meta[name=theme-color]').setAttribute('content', bg);
@@ -557,6 +584,7 @@ async function route() {
       case 'search': searchView(); break;
       case 'library': libraryView(args[0]); break;
       case 'settings': settingsView(); break;
+      case 'appearance': appearanceView(); break;
       case 'catalog': catalogView(args[0], args[1], token); break;
       case 'details': await detailsView(args[0], +args[1], token); break;
       case 'person': await personView(+args[0], token); break;
@@ -1687,11 +1715,7 @@ function settingsView() {
       <div class="chips" style="padding:10px 0 0"><button class="chip ${S.lang !== 'ar' ? 'on' : ''}" data-lang="en">English</button><button class="chip ${S.lang === 'ar' ? 'on' : ''}" data-lang="ar">العربية</button></div></div></div>
     ${standalone ? '' : `<div class="set-h">${ic('phone')}${T("Install on iPhone")}</div><div class="card"><div class="set-row"><div><b>${T("Add Lumio to your Home Screen")}</b><small>${T("In Safari, tap the Share button, then “Add to Home Screen”. Lumio then opens full-screen like an app.")}</small></div></div></div>`}
     <div class="set-h">${ic('palette')}${T("Appearance")}</div>
-    <div class="card"><div class="set-row" style="display:block"><b>${T("Theme colour")}</b><small class="dim">${T("Buttons, highlights, the navigation pill and progress bars")}</small>
-      <div class="colors" style="padding-top:14px">${ACCENTS.map(([k, n, c]) => `<button class="dot ${S.accent === k ? 'on' : ''}" data-acc="${k}"><i style="background:${c}">${ic('check')}</i>${n}</button>`).join('')}
-        <button class="dot custom ${S.accent === 'custom' ? 'on' : ''}" data-acc="custom"><i><span style="background:${S.customAccent}">${ic('check')}</span></i>${T("Custom")}</button></div>
-      ${S.accent === 'custom' ? `<div style="padding-top:14px"><input type="color" id="custc" value="${esc(S.customAccent)}" aria-label="Custom colour"></div>` : ''}</div></div>
-    <div class="card"><div class="set-row"><div><b>${T("AMOLED black")}</b><small>${T("Use pure black backgrounds for OLED screens")}</small></div>${sw('amoled', S.amoled)}</div></div>
+    <div class="card"><a class="set-row ap-row" href="#/appearance"><span class="ap-ic">${ic('palette')}</span><div><b>${T("Appearance")}</b><small>${T("Theme, title colour, Arabic font and app icon")}</small></div><span class="chev">${S.lang === 'ar' ? '‹' : '›'}</span></a></div>
 
     <div class="set-h">${ic('ffwd')}${T("Skipping")}</div>
     <div class="card">
@@ -1725,10 +1749,7 @@ function settingsView() {
   $('#psync').onclick = async () => { toast('Syncing…'); try { await serial(() => cloudPullNow(true)); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); settingsView(); } catch { toast('Network error'); } };
   view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
   const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
-  toggle('amoled', 'amoled'); toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
-  view.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => { S.accent = b.dataset.acc; saveSettings(); settingsView(); });
-  $('#custc')?.addEventListener('input', e => { S.customAccent = e.target.value; saveSettings(); });
-  $('#custc')?.addEventListener('change', () => settingsView());
+  toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
   view.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { const [k, m] = b.dataset.mode.split(':'); S[k] = m; saveSettings(); settingsView(); });
   $('#subScale').oninput = e => { S.subScale = +e.target.value; $('#ssv').textContent = Math.round(S.subScale * 100) + '%'; saveSettings(); };
   $('#subLang').onchange = e => { S.subLang = e.target.value.trim().toLowerCase(); saveSettings(); };
@@ -1740,6 +1761,39 @@ function settingsView() {
     catch (err) { toast("Couldn't load that manifest"); }
   };
   view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const a = S.addons[+b.dataset.del]; S.addons.splice(+b.dataset.del, 1); saveSettings(); toast('Removed ' + a.name); settingsView(); });
+}
+
+/** Settings → Appearance: theme colour, AMOLED, title colour, Arabic font, app icon colour (synced with the apps). */
+function appearanceView() {
+  const sw = (id, on) => `<button class="switch ${on ? 'on' : ''}" id="${id}" role="switch" aria-checked="${!!on}"></button>`;
+  const cinemaOn = S.accent === 'cinema' && S.titleColor === 'cinema' && S.arabicFont === 'cinema' && S.iconColor === 'cinema';
+  view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
+  <h1 class="page-title gutter" style="padding-inline-start:64px">${T("Appearance")}</h1><div class="gutter">
+    <div class="card ap-preview"><img src="${iconURL(S.iconColor || 'classic', 112)}" alt=""><div><h2>${S.lang === 'ar' ? 'السينما الليلة' : T('Tonight at the movies')}</h2><div class="bar"></div>
+      <span class="pill">${T('Play')}</span><span class="pill alt">${T('Details')}</span></div></div>
+    <div style="padding-top:12px"><button class="ap-cinema ${cinemaOn ? 'on' : ''}" id="apcin"><span style="font-size:30px">🎞️</span><div><b>${T("Classic cinema look")}</b><small class="dim">${T("Red titles, film-poster Arabic lettering, red theme and icon — in one tap")}</small></div></button></div>
+    <div class="card" style="margin-top:12px"><div class="set-row" style="display:block"><b>${T("Theme colour")}</b><small class="dim">${T("Buttons, highlights, the navigation pill and progress bars")}</small>
+      <div class="colors" style="padding-top:14px">${ACCENTS.map(([k, n, c]) => `<button class="dot ${S.accent === k ? 'on' : ''}" data-acc="${k}"><i style="background:${c}">${ic('check')}</i>${T(n)}</button>`).join('')}
+        <button class="dot custom ${S.accent === 'custom' ? 'on' : ''}" data-acc="custom"><i><span style="background:${esc(S.customAccent)}">${ic('check')}</span></i>${T("Custom")}</button></div>
+      ${S.accent === 'custom' ? `<div style="padding-top:14px"><input type="color" id="custc" value="${esc(S.customAccent)}" aria-label="Custom colour"></div>` : ''}</div></div>
+    <div class="card"><div class="set-row"><div><b>${T("AMOLED black")}</b><small>${T("Use pure black backgrounds for OLED screens")}</small></div>${sw('amoled', S.amoled)}</div></div>
+    <div class="card"><div class="set-row" style="display:block"><b>${T("Title colour")}</b><small class="dim">${T("Page titles and section headings")}</small>
+      <div class="colors" style="padding-top:14px">${TITLES.map(([k, n, c]) => `<button class="dot ${S.titleColor === k ? 'on' : ''}" data-title="${k}"><i style="background:${c || 'var(--accent)'}">${ic('check')}</i>${T(n)}</button>`).join('')}</div></div></div>
+    <div class="card"><div class="set-row" style="display:block"><b>${T("Arabic font")}</b><small class="dim">${T("Used when the app is in Arabic. Movie titles stay in English letters.")}</small>
+      <div class="ap-fonts">${AR_FONTS.map(([k, n, smp, fam]) => `<button class="ap-font ${S.arabicFont === k ? 'on' : ''}" data-font="${k}"><div style="flex:1"><b>${T(n)}</b><span class="smp" style="font-family:${fam};${k === 'cinema' ? 'color:var(--title)' : ''}">${smp} · أفلام ومسلسلات</span></div>${S.arabicFont === k ? ic('check') : ''}</button>`).join('')}</div></div></div>
+    <div class="card"><div class="set-row" style="display:block"><b>${T("App icon")}</b><small class="dim">${T("Changes the browser and new Home Screen icon; the phone and TV apps follow too")}</small>
+      <div class="ap-icons">${ICONS.map(([k, n]) => `<button class="ap-icon ${S.iconColor === k ? 'on' : ''}" data-icon="${k}"><img src="${iconURL(k, 116)}" alt="">${T(n)}</button>`).join('')}</div></div></div>
+    <p class="dim" style="font-size:12px;padding:16px 0 40px">${T("Saved in your account — your phone, TV and the website all follow these choices.")}</p>
+  </div>`;
+  const set = patch => { Object.assign(S, patch); saveSettings(); appearanceView(); };
+  $('#apcin').onclick = () => set({ accent: 'cinema', titleColor: 'cinema', arabicFont: 'cinema', iconColor: 'cinema' });
+  $('#amoled').onclick = () => set({ amoled: !S.amoled });
+  view.querySelectorAll('[data-acc]').forEach(b => b.onclick = () => set({ accent: b.dataset.acc }));
+  $('#custc')?.addEventListener('input', e => { S.customAccent = e.target.value; saveSettings(); });
+  $('#custc')?.addEventListener('change', () => appearanceView());
+  view.querySelectorAll('[data-title]').forEach(b => b.onclick = () => set({ titleColor: b.dataset.title }));
+  view.querySelectorAll('[data-font]').forEach(b => b.onclick = () => set({ arabicFont: b.dataset.font }));
+  view.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => set({ iconColor: b.dataset.icon }));
 }
 
 // ============================================================================ boot
