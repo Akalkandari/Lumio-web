@@ -1142,6 +1142,8 @@ function openPlayer() {
   v.addEventListener('play', () => { setPP(); showUI(); pLocal('play'); });
   v.addEventListener('pause', () => { setPP(); ui.classList.remove('off'); saveProgress(); pLocal('pause'); });
   v.addEventListener('seeked', () => pLocal('seek'));
+  v.addEventListener('waiting', () => { PLAYER.waitingSince = performance.now(); if (isCtl()) setTimeout(() => { if (PLAYER.waitingSince && PLAYER.v === v) pPublish(); }, 1100); });
+  v.addEventListener('playing', () => { const was = PLAYER.waitingSince; PLAYER.waitingSince = 0; if (was && isCtl()) pPublish(); });
   PARTY.ourSeeks = r.start ? 1 : 0;   // the start position jump is ours too
   v.addEventListener('canplay', () => { if (isCtl()) pPublish(); }, { once: true });
   $('#pparty', el)?.addEventListener('click', e => { e.stopPropagation(); partySheet(); });
@@ -1911,8 +1913,8 @@ function partyLeave(quiet) {
   if (!quiet) pRender();
 }
 
-const pExpected = () => { const r = PARTY.remote; return !r ? 0 : r.playing ? r.pos + (performance.now() - r.at) * r.rate + 120 : r.pos; };
-function pPublish() {
+const pExpected = () => { const r = PARTY.remote; return !r ? 0 : r.playing ? r.pos + Math.min(8000, performance.now() - r.at) * r.rate + 120 : r.pos; };
+function pPublish(seek) {
   if (!PARTY.code || !isCtl()) return;
   const r = PLAYER.req, v = PLAYER.v;
   let t = PARTY.title;
@@ -1922,9 +1924,11 @@ function pPublish() {
     if (PARTY.shareStream && r.addon) t.url = r.url;
   }
   PARTY.title = t;
-  const playing = !!v && !v.paused && !v.ended, pos = v ? Math.round(v.currentTime * 1000) : pExpected(), rate = v ? v.playbackRate || 1 : 1;
+  // "Playing" only when it really is: stuck loading for over a second counts as paused, so everyone waits together
+  const playing = !!v && !v.paused && !v.ended && !(PLAYER.waitingSince && performance.now() - PLAYER.waitingSince > 1000), pos = v ? Math.round(v.currentTime * 1000) : pExpected(), rate = v ? v.playbackRate || 1 : 1;
   PARTY.remote = { playing, pos, rate, at: performance.now() };
   const payload = { from: PARTY.id, host: PARTY.hostId || PARTY.id, controller: PARTY.controllerId || PARTY.id, playing, pos, rate };
+  if (seek) payload.seek = true;
   if (t) payload.title = t;
   pCast('state', payload);
 }
@@ -1938,6 +1942,7 @@ function pHandle(ev, o) {
     if (o.controller && o.controller !== PARTY.controllerId) { PARTY.controllerId = o.controller; if (isCtl()) { toast("You're in control"); PARTY.asked = false; PARTY.detached = false; if (PLAYER.v) PLAYER.v.playbackRate = 1; } }
     if (isCtl()) return;
     PARTY.remote = { playing: !!o.playing, pos: +o.pos || 0, rate: Math.min(3, Math.max(.25, +o.rate || 1)), at: performance.now() };
+    if (o.seek) PARTY.forceNext = true;
     if (o.title && o.title.type && o.title.tmdbId) {
       PARTY.title = o.title;
       if (reqKey(PLAYER.el ? PLAYER.req : null) !== pKey(o.title)) pOpenTitle(o.title);
@@ -1994,24 +1999,30 @@ function partyGive(id) { if (!isHost()) return; PARTY.controllerId = id; PARTY.r
  */
 function pPlan(i) {
   const play = i.localPlaying !== i.remotePlaying ? i.remotePlaying : null;
-  if (!i.ready || i.now - i.lastSeekAt < 3500) return { play, seekTo: null, speed: i.rate };
-  const diff = i.expected - i.localPos, tol = !i.remotePlaying ? 800 : i.canChangeSpeed ? 4000 : 1500;
-  if (Math.abs(diff) > tol) return { play, seekTo: Math.max(0, i.expected + (i.remotePlaying ? i.seekLead : 0)), speed: i.rate };
-  if (i.canChangeSpeed && i.remotePlaying && Math.abs(diff) > 300) { const k = Math.abs(diff) > 1000 ? .08 : .04; return { play, seekTo: null, speed: i.rate * (diff > 0 ? 1 + k : 1 - k) }; }
-  return { play, seekTo: null, speed: i.rate };
+  if (!i.ready || i.now - i.lastSeekAt < 3500) return { play, seekTo: null, speed: i.rate, strikes: 0 };
+  const diff = i.expected - i.localPos;
+  const jump = () => ({ play, seekTo: Math.max(0, i.expected + (i.remotePlaying ? i.seekLead : 0)), speed: i.rate, strikes: 0 });
+  if (i.forceSeek && Math.abs(diff) > 800) return jump();
+  const tol = !i.remotePlaying ? 800 : i.canChangeSpeed ? 4000 : 2500;
+  if (Math.abs(diff) > tol) { const k = i.strikes + 1; return k >= 3 || !i.remotePlaying ? jump() : { play, seekTo: null, speed: i.rate, strikes: k }; }   // only drift that lasts ≈1.5 s
+  if (i.canChangeSpeed && i.remotePlaying && Math.abs(diff) > 300) { const k = Math.abs(diff) > 1000 ? .08 : .04; return { play, seekTo: null, speed: i.rate * (diff > 0 ? 1 + k : 1 - k), strikes: 0 }; }
+  return { play, seekTo: null, speed: i.rate, strikes: 0 };
 }
-PARTY.lastSeekAt = 0; PARTY.seekLead = 1500; PARTY.waitingSeek = false;
+PARTY.lastSeekAt = 0; PARTY.seekLead = 1000; PARTY.waitingSeek = false; PARTY.strikes = 0; PARTY.forceNext = false;
 /** Called by the player: follow whoever's in control. */
 function pSync() {
   const v = PLAYER.v, r = PARTY.remote;
   if (!v || !PARTY.code || isCtl() || PARTY.detached || !r || reqKey(PLAYER.req) !== pKey(PARTY.title)) { if (v && PARTY.code && !isCtl() && !r) v.playbackRate = 1; return; }
   const now = performance.now(), ready = v.readyState >= 3 && !v.seeking;
-  if (PARTY.waitingSeek && ready) { PARTY.waitingSeek = false; PARTY.seekLead = Math.min(8000, Math.max(300, (PARTY.seekLead + now - PARTY.lastSeekAt) / 2)); }
+  // A jump landed: aim better next time by how far behind (+) or ahead (−) it landed
+  if (PARTY.waitingSeek && ready && r.playing) { PARTY.waitingSeek = false; PARTY.seekLead = Math.min(8000, Math.max(0, PARTY.seekLead + (pExpected() - v.currentTime * 1000) * .7)); }
   const plan = pPlan({ ready, localPlaying: !v.paused, localPos: v.currentTime * 1000, remotePlaying: r.playing, expected: pExpected(), rate: r.rate,
-    now, lastSeekAt: PARTY.lastSeekAt, seekLead: PARTY.seekLead, canChangeSpeed: true });
+    now, lastSeekAt: PARTY.lastSeekAt, seekLead: PARTY.seekLead, canChangeSpeed: true, strikes: PARTY.strikes, forceSeek: PARTY.forceNext });
+  PARTY.strikes = plan.strikes;
+  if (PARTY.forceNext && ready && now - PARTY.lastSeekAt >= 3500 && plan.seekTo == null && Math.abs(pExpected() - v.currentTime * 1000) <= 800) PARTY.forceNext = false;
   if (plan.play === true) { PARTY.applyUntil = Date.now() + 1500; v.play().catch(() => {}); }
   else if (plan.play === false) { PARTY.applyUntil = Date.now() + 1500; v.pause(); }
-  if (plan.seekTo != null) { PARTY.ourSeeks++; PARTY.lastSeekAt = now; PARTY.waitingSeek = true; v.currentTime = plan.seekTo / 1000; }
+  if (plan.seekTo != null) { PARTY.ourSeeks++; PARTY.lastSeekAt = now; PARTY.waitingSeek = true; PARTY.forceNext = false; v.currentTime = plan.seekTo / 1000; }
   if (Math.abs(v.playbackRate - plan.speed) > .001) v.playbackRate = plan.speed;
 }
 PARTY.ourSeeks = 0;
@@ -2019,7 +2030,9 @@ function pLocal(kind) {
   if (!PARTY.code) return;
   if (kind === 'seek' && PARTY.ourSeeks > 0) { PARTY.ourSeeks--; return; }   // one of our own catch-up jumps finished
   if (kind !== 'seek' && Date.now() < PARTY.applyUntil) return;
-  if (!isCtl() && PLAYER.v && PLAYER.v.readyState < 3 && kind !== 'seek') return; if (isCtl()) pPublish(); else if (PARTY.remote) { PARTY.detached = true; pRender(); } }
+  if (!isCtl() && PLAYER.v && PLAYER.v.readyState < 3 && kind !== 'seek') return;
+  if (isCtl()) return pPublish(kind === 'seek');
+  if (PARTY.remote) { PARTY.detached = true; pRender(); } }
 
 async function pOpenTitle(t) {
   if (isCtl() || PARTY.opening === pKey(t)) return;
