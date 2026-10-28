@@ -1139,9 +1139,10 @@ function openPlayer() {
   const showUI = () => { ui.classList.remove('off'); clearTimeout(hideT); hideT = setTimeout(() => { if (!v.paused && !$('.sheet')) ui.classList.add('off'); }, 3800); };
   showUI();
   const setPP = () => { $('#ppp', el).innerHTML = ic(v.paused ? 'play' : 'pause'); };
-  v.addEventListener('play', () => { setPP(); showUI(); pLocal(); });
-  v.addEventListener('pause', () => { setPP(); ui.classList.remove('off'); saveProgress(); pLocal(); });
-  v.addEventListener('seeked', () => pLocal());
+  v.addEventListener('play', () => { setPP(); showUI(); pLocal('play'); });
+  v.addEventListener('pause', () => { setPP(); ui.classList.remove('off'); saveProgress(); pLocal('pause'); });
+  v.addEventListener('seeked', () => pLocal('seek'));
+  PARTY.ourSeeks = r.start ? 1 : 0;   // the start position jump is ours too
   v.addEventListener('canplay', () => { if (isCtl()) pPublish(); }, { once: true });
   $('#pparty', el)?.addEventListener('click', e => { e.stopPropagation(); partySheet(); });
   PLAYER.partyT = setInterval(() => { if (PLAYER.v === v) pSync(); }, 500);
@@ -1987,18 +1988,38 @@ function partyChat(text) {
 function partyReact(e) { pFloat(e, myName()); pCast('react', { from: PARTY.id, name: myName(), emoji: e }); }
 function partyGive(id) { if (!isHost()) return; PARTY.controllerId = id; PARTY.requests = PARTY.requests.filter(m => m.id !== id); pCast('control', { from: PARTY.id, controller: id }); if (id === PARTY.id) pPublish(); pRender(); pSheetRefresh(); }
 
+/**
+ * How a follower catches up (same rules as the apps): never act while the video is loading, wait a few seconds
+ * after a jump, jump *ahead* by the time this device needs to load, and nudge the speed only for small drift.
+ */
+function pPlan(i) {
+  const play = i.localPlaying !== i.remotePlaying ? i.remotePlaying : null;
+  if (!i.ready || i.now - i.lastSeekAt < 3500) return { play, seekTo: null, speed: i.rate };
+  const diff = i.expected - i.localPos, tol = !i.remotePlaying ? 800 : i.canChangeSpeed ? 4000 : 1500;
+  if (Math.abs(diff) > tol) return { play, seekTo: Math.max(0, i.expected + (i.remotePlaying ? i.seekLead : 0)), speed: i.rate };
+  if (i.canChangeSpeed && i.remotePlaying && Math.abs(diff) > 300) { const k = Math.abs(diff) > 1000 ? .08 : .04; return { play, seekTo: null, speed: i.rate * (diff > 0 ? 1 + k : 1 - k) }; }
+  return { play, seekTo: null, speed: i.rate };
+}
+PARTY.lastSeekAt = 0; PARTY.seekLead = 1500; PARTY.waitingSeek = false;
 /** Called by the player: follow whoever's in control. */
 function pSync() {
   const v = PLAYER.v, r = PARTY.remote;
-  if (!v || !PARTY.code || isCtl() || PARTY.detached || !r || reqKey(PLAYER.req) !== pKey(PARTY.title) || v.readyState < 2) { if (v && PARTY.code && !isCtl() && !r) v.playbackRate = 1; return; }
-  const mine = () => { PARTY.applyUntil = Date.now() + 700; };   // only our own changes are marked
-  if (r.playing && v.paused) { mine(); v.play().catch(() => {}); } else if (!r.playing && !v.paused) { mine(); v.pause(); }
-  const exp = pExpected(), diff = exp - v.currentTime * 1000;
-  if (Math.abs(diff) > 2500) { mine(); v.currentTime = Math.max(0, exp / 1000); v.playbackRate = r.rate; }
-  else if (r.playing && Math.abs(diff) > 250) v.playbackRate = r.rate * (diff > 0 ? 1.05 : .95);
-  else v.playbackRate = r.rate;
+  if (!v || !PARTY.code || isCtl() || PARTY.detached || !r || reqKey(PLAYER.req) !== pKey(PARTY.title)) { if (v && PARTY.code && !isCtl() && !r) v.playbackRate = 1; return; }
+  const now = performance.now(), ready = v.readyState >= 3 && !v.seeking;
+  if (PARTY.waitingSeek && ready) { PARTY.waitingSeek = false; PARTY.seekLead = Math.min(8000, Math.max(300, (PARTY.seekLead + now - PARTY.lastSeekAt) / 2)); }
+  const plan = pPlan({ ready, localPlaying: !v.paused, localPos: v.currentTime * 1000, remotePlaying: r.playing, expected: pExpected(), rate: r.rate,
+    now, lastSeekAt: PARTY.lastSeekAt, seekLead: PARTY.seekLead, canChangeSpeed: true });
+  if (plan.play === true) { PARTY.applyUntil = Date.now() + 1500; v.play().catch(() => {}); }
+  else if (plan.play === false) { PARTY.applyUntil = Date.now() + 1500; v.pause(); }
+  if (plan.seekTo != null) { PARTY.ourSeeks++; PARTY.lastSeekAt = now; PARTY.waitingSeek = true; v.currentTime = plan.seekTo / 1000; }
+  if (Math.abs(v.playbackRate - plan.speed) > .001) v.playbackRate = plan.speed;
 }
-function pLocal() { if (!PARTY.code || Date.now() < PARTY.applyUntil || (PLAYER.v && PLAYER.v.readyState < 3 && !isCtl())) return; if (isCtl()) pPublish(); else if (PARTY.remote) { PARTY.detached = true; pRender(); } }
+PARTY.ourSeeks = 0;
+function pLocal(kind) {
+  if (!PARTY.code) return;
+  if (kind === 'seek' && PARTY.ourSeeks > 0) { PARTY.ourSeeks--; return; }   // one of our own catch-up jumps finished
+  if (kind !== 'seek' && Date.now() < PARTY.applyUntil) return;
+  if (!isCtl() && PLAYER.v && PLAYER.v.readyState < 3 && kind !== 'seek') return; if (isCtl()) pPublish(); else if (PARTY.remote) { PARTY.detached = true; pRender(); } }
 
 async function pOpenTitle(t) {
   if (isCtl() || PARTY.opening === pKey(t)) return;
