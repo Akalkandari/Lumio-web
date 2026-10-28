@@ -108,6 +108,8 @@ const P = {
   info: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z',
   ffwd: 'M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z', next: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
   playC: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z',
+  group: 'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
+  sync: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z',
   palette: 'M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
   ext: 'M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z',
   del: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
@@ -574,6 +576,7 @@ async function route() {
   const token = ++routeToken;
   const tab = TABS.some(t => t[0] === name) ? name : null;
   renderNav(tab);
+  setTimeout(pPill, 0);
   view.classList.remove('view-enter'); void view.offsetWidth; view.classList.add('view-enter');
   closeSheet();
   try {
@@ -585,6 +588,7 @@ async function route() {
       case 'library': libraryView(args[0]); break;
       case 'settings': settingsView(); break;
       case 'appearance': appearanceView(); break;
+      case 'party': partyView(args[0]); break;
       case 'catalog': catalogView(args[0], args[1], token); break;
       case 'details': await detailsView(args[0], +args[1], token); break;
       case 'person': await personView(+args[0], token); break;
@@ -1089,8 +1093,10 @@ function closePlayer(fromRoute, skipSave) {
   if (!PLAYER.el) return;
   if (!skipSave) saveProgress();
   try { PLAYER.hls?.destroy(); PLAYER.hls = null; PLAYER.v.pause(); PLAYER.v.removeAttribute('src'); PLAYER.v.load(); } catch { /* ignore */ }
-  clearInterval(PLAYER.saveT);
+  clearInterval(PLAYER.saveT); clearInterval(PLAYER.partyT);
   PLAYER.el.remove(); PLAYER.el = null; PLAYER.v = null;
+  if (isCtl()) pPublish();   // host closed the player → party pauses
+  setTimeout(pPill, 0);
   document.body.style.overflow = '';
   if (!fromRoute && location.hash === '#/play') history.back();
 }
@@ -1106,7 +1112,7 @@ function openPlayer() {
     <div class="spinner" id="spin"></div>
     <div class="p-ui" id="pui">
       <div class="p-top"><button class="icon-btn" id="pclose" aria-label="Close">${ic('back')}</button><div><b>${esc(r.title)}</b><small>${esc(r.subtitle || '')}</small></div>
-        <button class="icon-btn" id="pair" aria-label="AirPlay">${ic('airplay')}</button><button class="icon-btn" id="ppip" aria-label="Picture in picture">${ic('pip')}</button></div>
+        ${r.id && !r.local && !r.live ? `<button class="icon-btn pparty" id="pparty" aria-label="${T('Watch party')}">${ic('group')}</button>` : ''}<button class="icon-btn" id="pair" aria-label="AirPlay">${ic('airplay')}</button><button class="icon-btn" id="ppip" aria-label="Picture in picture">${ic('pip')}</button></div>
       <div class="p-mid"><button id="prew" aria-label="Back 10 seconds">${ic10('rew')}</button><button class="p-play" id="ppp" aria-label="Play or pause">${ic('play')}</button><button id="pfwd" aria-label="Forward 10 seconds">${ic10('fwd')}</button></div>
       <div class="p-bot"><div class="p-time"><span id="tcur">0:00</span><div class="p-seek" id="seek"><div class="tr"><div class="buf" id="sbuf"></div><div class="cur" id="scur"></div></div><div class="th" id="sth"></div></div><span id="tleft">-0:00</span></div>
         <div class="p-btns"><button id="bsub">${ic('subs')}<span>${T("Subtitles")}</span></button><button id="baud">${ic('audio')}<span>${T("Audio")}</span></button><button id="bspd">${ic('speed')}<span>${T("Speed")}</span></button>
@@ -1133,8 +1139,14 @@ function openPlayer() {
   const showUI = () => { ui.classList.remove('off'); clearTimeout(hideT); hideT = setTimeout(() => { if (!v.paused && !$('.sheet')) ui.classList.add('off'); }, 3800); };
   showUI();
   const setPP = () => { $('#ppp', el).innerHTML = ic(v.paused ? 'play' : 'pause'); };
-  v.addEventListener('play', () => { setPP(); showUI(); });
-  v.addEventListener('pause', () => { setPP(); ui.classList.remove('off'); saveProgress(); });
+  v.addEventListener('play', () => { setPP(); showUI(); pLocal(); });
+  v.addEventListener('pause', () => { setPP(); ui.classList.remove('off'); saveProgress(); pLocal(); });
+  v.addEventListener('seeked', () => pLocal());
+  v.addEventListener('canplay', () => { if (isCtl()) pPublish(); }, { once: true });
+  $('#pparty', el)?.addEventListener('click', e => { e.stopPropagation(); partySheet(); });
+  PLAYER.partyT = setInterval(() => { if (PLAYER.v === v) pSync(); }, 500);
+  if (isCtl()) setTimeout(pPublish, 300);
+  setTimeout(pRender, 0);
   v.addEventListener('waiting', () => spin.hidden = false);
   v.addEventListener('playing', () => spin.hidden = true);
   v.addEventListener('canplay', () => spin.hidden = true);
@@ -1257,6 +1269,7 @@ function openPlayer() {
   }
   v.addEventListener('timeupdate', () => {
     const pos = v.currentTime * 1000, dur = v.duration * 1000; if (!dur) return;
+    if (PARTY.code && !isCtl() && !PARTY.detached) return showPill(null);   // in a party, the one in control skips
     const f = st.filters.find(f => (S.skipNudity || f.kind === 'custom') && pos >= f.start && pos < f.end - 300);
     if (f) { v.currentTime = f.end / 1000; toast('Scene skipped'); return; }
     const seg = st.segs.find(s => pos >= s.start && pos < (s.end ?? dur) - 300);
@@ -1641,6 +1654,7 @@ function enterProfile(id) {
   unlocked.clear(); loadProfileData(); applyTheme(); applyLang();
   PROFILE_CHOSEN = true;
   document.querySelectorAll('.welcome').forEach(x => x.remove());
+  if (PENDING_PARTY) { const c = PENDING_PARTY; PENDING_PARTY = null; location.hash = '#/party/' + c; return; }
   if (location.hash !== '#/home') location.hash = '#/home'; else route();
 }
 
@@ -1717,6 +1731,11 @@ function settingsView() {
     <div class="set-h">${ic('palette')}${T("Appearance")}</div>
     <div class="card"><a class="set-row ap-row" href="#/appearance"><span class="ap-ic">${ic('palette')}</span><div><b>${T("Appearance")}</b><small>${T("Theme, title colour, Arabic font and app icon")}</small></div><span class="chev">${S.lang === 'ar' ? '‹' : '›'}</span></a></div>
 
+    <div class="set-h">${ic('group')}${T("Watch party")}</div>
+    <div class="card"><div class="set-row" style="display:block">${PARTY.code ? `<b>🎉 ${T('In party')} ${esc(PARTY.code)} · ${PARTY.members.length} ${T('watching')}</b>`
+      : `<small>${T("Start a party from the player while watching (the 👥 button), or join a friend's with their code.")}</small>
+      <form id="sjoin" class="prow" style="padding-top:10px"><input class="field" id="sjc" placeholder="ABC123" maxlength="8" autocapitalize="characters" autocomplete="off"><button class="btn acc">${T('Join')}</button></form>`}</div></div>
+
     <div class="set-h">${ic('ffwd')}${T("Skipping")}</div>
     <div class="card">
       <div class="set-row" style="display:block"><b>${T("Skip intros")}</b><small>${T("Opening titles and theme songs")}</small>${modeChips('skipIntro', S.skipIntro)}</div>
@@ -1750,6 +1769,7 @@ function settingsView() {
   view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
   const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
   toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
+  $('#sjoin')?.addEventListener('submit', e => { e.preventDefault(); location.hash = '#/party/' + $('#sjc').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
   view.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { const [k, m] = b.dataset.mode.split(':'); S[k] = m; saveSettings(); settingsView(); });
   $('#subScale').oninput = e => { S.subScale = +e.target.value; $('#ssv').textContent = Math.round(S.subScale * 100) + '%'; saveSettings(); };
   $('#subLang').onchange = e => { S.subLang = e.target.value.trim().toLowerCase(); saveSettings(); };
@@ -1796,6 +1816,294 @@ function appearanceView() {
   view.querySelectorAll('[data-icon]').forEach(b => b.onclick = () => set({ iconColor: b.dataset.icon }));
 }
 
+
+// ============================================================================ watch party
+/**
+ * Watch together with the phone and TV apps: same rooms (Supabase Realtime, nothing stored), same rules.
+ * Whoever is in control sends the playback state; everyone else follows (±5% speed for small drift,
+ * a jump for big drift). Guests play from their own add-ons, with the host's stream as a backup.
+ */
+const PARTY = {
+  id: Array.from({ length: 10 }, () => 'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 31)]).join(''),
+  code: null, ws: null, joined: false, connected: false, ref: 0, joinRef: null, hb: null, retry: 0, closed: true,
+  members: [], presence: {}, hostId: null, controllerId: null, title: null, remote: null, chat: [], unread: 0,
+  requests: [], detached: false, asked: false, shareStream: true, opening: null, applyUntil: 0, joinedAt: 0, ticker: null, hostCheck: null,
+};
+const QUICK_MSGS = ['Ready! 👍', 'Pause please ⏸️', 'Wait for me ⏳', "Can't hear 🔇", 'Back in a minute', 'Good night 👋'];
+const REACTS = ['❤️', '😂', '😮', '😢', '👏', '🔥'];
+const isHost = () => PARTY.hostId === PARTY.id, isCtl = () => PARTY.controllerId === PARTY.id;
+const pName = id => (PARTY.members.find(m => m.id === id) || {}).name || '?';
+const myName = () => activeProfile().name || 'Me';
+const inviteUrl = () => location.origin + location.pathname + '#/party/' + PARTY.code;
+const pKey = t => t ? `${t.type}-${t.tmdbId}-${t.season || 0}-${t.episode || 0}` : '';
+const reqKey = r => r && r.id && r.type ? `${r.type}-${r.id}-${r.season || 0}-${r.episode || 0}` : '';
+
+function pSend(event, payload, topic) {
+  const t = topic || 'realtime:lumio-party-' + PARTY.code;
+  const msg = { topic: t, event, payload, ref: String(++PARTY.ref) };
+  if (t !== 'phoenix' && PARTY.joinRef) msg.join_ref = PARTY.joinRef;
+  try { PARTY.ws?.readyState === 1 && PARTY.ws.send(JSON.stringify(msg)); } catch { /* reconnects */ }
+}
+const pCast = (event, payload) => pSend('broadcast', { type: 'broadcast', event, payload });
+function pTrack() { if (PARTY.joined) pSend('presence', { type: 'presence', event: 'track', payload: { id: PARTY.id, name: myName(), device: 'web', joinedAt: PARTY.joinedAt } }); }
+
+function pConnect() {
+  const ws = new WebSocket(SB_URL.replace('https://', 'wss://') + '/realtime/v1/websocket?apikey=' + SB_KEY + '&vsn=1.0.0');
+  PARTY.ws = ws;
+  ws.onopen = () => {
+    PARTY.joinRef = String(++PARTY.ref);
+    ws.send(JSON.stringify({ topic: 'realtime:lumio-party-' + PARTY.code, event: 'phx_join', ref: PARTY.joinRef, join_ref: PARTY.joinRef,
+      payload: { config: { broadcast: { self: false, ack: false }, presence: { key: PARTY.id }, private: false }, access_token: SB_KEY } }));
+    clearInterval(PARTY.hb); PARTY.hb = setInterval(() => pSend('heartbeat', {}, 'phoenix'), 25000);
+  };
+  ws.onmessage = e => { try { pOnMessage(JSON.parse(e.data)); } catch { /* ignore */ } };
+  ws.onclose = () => {
+    PARTY.joined = false; PARTY.connected = false; clearInterval(PARTY.hb); pRender();
+    if (PARTY.closed) return;
+    setTimeout(() => { if (!PARTY.closed) pConnect(); }, Math.min(15000, 1000 * 2 ** Math.min(4, PARTY.retry++)));
+  };
+}
+function pOnMessage(m) {
+  if (m.topic !== 'realtime:lumio-party-' + PARTY.code) return;
+  const p = m.payload || {};
+  if (m.event === 'phx_reply' && m.ref === PARTY.joinRef) {
+    if (p.status === 'ok') { PARTY.joined = true; PARTY.connected = true; PARTY.retry = 0; pTrack(); if (!isCtl()) pCast('hello', { from: PARTY.id }); pRender(); }
+  } else if (m.event === 'broadcast') pHandle(p.event, p.payload || {});
+  else if (m.event === 'presence_state') { PARTY.presence = {}; for (const [k, v] of Object.entries(p)) PARTY.presence[k] = v.metas || []; pPresence(); }
+  else if (m.event === 'presence_diff') {
+    for (const [k, v] of Object.entries(p.joins || {})) PARTY.presence[k] = (PARTY.presence[k] || []).concat(v.metas || []);
+    for (const [k, v] of Object.entries(p.leaves || {})) {
+      const gone = new Set((v.metas || []).map(x => x.phx_ref));
+      PARTY.presence[k] = (PARTY.presence[k] || []).filter(x => !gone.has(x.phx_ref)); if (!PARTY.presence[k].length) delete PARTY.presence[k];
+    }
+    pPresence();
+  } else if (m.event === 'phx_error' || m.event === 'phx_close') PARTY.ws?.close();
+}
+
+function partyStart(code) {
+  partyLeave(true);
+  Object.assign(PARTY, { code, closed: false, joinedAt: Date.now(), members: [], presence: {}, hostId: null, controllerId: null, title: null, remote: null,
+    chat: [], unread: 0, requests: [], detached: false, asked: false, opening: null });
+  pConnect();
+  clearInterval(PARTY.ticker); PARTY.ticker = setInterval(() => { if (isCtl()) pPublish(); }, 4000);
+  pRender();
+}
+function partyCreate() {
+  const r = PLAYER.req;
+  if (!r || !r.id || !r.type || r.local || r.live) return toast('Watch parties work with movies and series from your add-ons');
+  partyStart(Array.from({ length: 6 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join(''));
+  PARTY.hostId = PARTY.controllerId = PARTY.id;
+  pPublish(); pRender();
+}
+function partyJoin(raw) {
+  const c = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  if (c.length < 4) return toast('Enter the party code');
+  if (PARTY.code === c && !PARTY.closed) return;
+  partyStart(c); toast(T('Joining party') + ' ' + c + '…');
+}
+function partyLeave(quiet) {
+  if (!PARTY.code) return;
+  pCast('bye', { from: PARTY.id }); PARTY.closed = true; try { PARTY.ws?.close(); } catch { /* */ }
+  clearInterval(PARTY.ticker); clearInterval(PARTY.hb); clearTimeout(PARTY.hostCheck);
+  PARTY.code = null; PARTY.members = []; PARTY.hostId = PARTY.controllerId = null; PARTY.title = PARTY.remote = null; PARTY.detached = false;
+  if (PLAYER.v) PLAYER.v.playbackRate = 1;
+  if (!quiet) pRender();
+}
+
+const pExpected = () => { const r = PARTY.remote; return !r ? 0 : r.playing ? r.pos + (performance.now() - r.at) * r.rate + 120 : r.pos; };
+function pPublish() {
+  if (!PARTY.code || !isCtl()) return;
+  const r = PLAYER.req, v = PLAYER.v;
+  let t = PARTY.title;
+  if (r && r.id && r.type && !r.local && !r.live) {
+    t = { type: r.type, tmdbId: r.id, imdbId: r.imdb || null, season: r.season ?? null, episode: r.episode ?? null, title: r.title || '', subtitle: r.subtitle || '',
+      poster: r.poster || null, backdrop: r.backdrop || null, addon: r.addon || null };
+    if (PARTY.shareStream && r.addon) t.url = r.url;
+  }
+  PARTY.title = t;
+  const playing = !!v && !v.paused && !v.ended, pos = v ? Math.round(v.currentTime * 1000) : pExpected(), rate = v ? v.playbackRate || 1 : 1;
+  PARTY.remote = { playing, pos, rate, at: performance.now() };
+  const payload = { from: PARTY.id, host: PARTY.hostId || PARTY.id, controller: PARTY.controllerId || PARTY.id, playing, pos, rate };
+  if (t) payload.title = t;
+  pCast('state', payload);
+}
+function pHandle(ev, o) {
+  const from = o.from;
+  if (ev === 'state') {
+    if (!from || from === PARTY.id) return;
+    if (isHost() && o.host === from) { PARTY.hostId = from; PARTY.controllerId = o.controller || from; }
+    if (PARTY.hostId && from !== PARTY.hostId && from !== PARTY.controllerId) return;
+    if (o.host) PARTY.hostId = o.host;
+    if (o.controller && o.controller !== PARTY.controllerId) { PARTY.controllerId = o.controller; if (isCtl()) { toast("You're in control"); PARTY.asked = false; PARTY.detached = false; if (PLAYER.v) PLAYER.v.playbackRate = 1; } }
+    if (isCtl()) return;
+    PARTY.remote = { playing: !!o.playing, pos: +o.pos || 0, rate: Math.min(3, Math.max(.25, +o.rate || 1)), at: performance.now() };
+    if (o.title && o.title.type && o.title.tmdbId) {
+      PARTY.title = o.title;
+      if (reqKey(PLAYER.el ? PLAYER.req : null) !== pKey(o.title)) pOpenTitle(o.title);
+    }
+    pSync(); pRender();
+  } else if (ev === 'hello') { if (isCtl()) pPublish(); }
+  else if (ev === 'control') {
+    if (from !== PARTY.hostId || !o.controller) return;
+    PARTY.controllerId = o.controller;
+    if (isCtl()) { toast("You're in control"); PARTY.asked = false; PARTY.detached = false; if (PLAYER.v) PLAYER.v.playbackRate = 1; pPublish(); } else toast(pName(o.controller) + ' ' + T('is in control'));
+    pRender();
+  } else if (ev === 'ask') { if (isHost() && from && !PARTY.requests.some(m => m.id === from)) { PARTY.requests.push({ id: from, name: o.name || '?' }); pRender(); } }
+  else if (ev === 'chat') {
+    if (!o.id || PARTY.chat.some(c => c.id === o.id)) return;
+    PARTY.chat.push({ id: o.id, from, name: o.name || '?', text: String(o.text || '').slice(0, 300), mine: false, at: Date.now() });
+    if (PARTY.chat.length > 200) PARTY.chat.shift();
+    if (!$('.sheet.party')) PARTY.unread++;
+    pRender(); pSheetRefresh();
+  } else if (ev === 'react') pFloat(o.emoji, o.name);
+}
+function pPresence() {
+  const before = new Set(PARTY.members.map(m => m.id));
+  PARTY.members = Object.entries(PARTY.presence).map(([k, metas]) => { const m = metas[metas.length - 1] || {}; return { id: m.id || k, name: m.name || '?', device: m.device || 'phone', joinedAt: +m.joinedAt || 0 }; })
+    .sort((a, b) => a.joinedAt - b.joinedAt);
+  const now = new Set(PARTY.members.map(m => m.id));
+  if (before.size) for (const id of now) if (!before.has(id) && id !== PARTY.id) toast(pName(id) + ' ' + T('joined'));
+  PARTY.requests = PARTY.requests.filter(m => now.has(m.id));
+  const host = PARTY.hostId;
+  if (host && !now.has(host) && now.has(PARTY.id)) {
+    clearTimeout(PARTY.hostCheck);
+    PARTY.hostCheck = setTimeout(() => {
+      const ids = PARTY.members.map(m => m.id);
+      if (!PARTY.code || PARTY.hostId !== host || ids.includes(host) || !ids.length) return;
+      PARTY.hostId = ids[0];
+      if (!PARTY.controllerId || !ids.includes(PARTY.controllerId)) PARTY.controllerId = ids[0];
+      if (isHost()) { toast("You're now the host"); pPublish(); } else toast(pName(ids[0]) + ' ' + T('is now the host'));
+      pRender();
+    }, 10000);
+  } else if (PARTY.controllerId && !now.has(PARTY.controllerId) && isHost()) { PARTY.controllerId = PARTY.id; pPublish(); }
+  pRender(); pSheetRefresh();
+}
+function partyChat(text) {
+  text = String(text || '').trim().slice(0, 300); if (!text || !PARTY.code) return;
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  PARTY.chat.push({ id, from: PARTY.id, name: myName(), text, mine: true, at: Date.now() });
+  pCast('chat', { id, from: PARTY.id, name: myName(), text }); pRender(); pSheetRefresh();
+}
+function partyReact(e) { pFloat(e, myName()); pCast('react', { from: PARTY.id, name: myName(), emoji: e }); }
+function partyGive(id) { if (!isHost()) return; PARTY.controllerId = id; PARTY.requests = PARTY.requests.filter(m => m.id !== id); pCast('control', { from: PARTY.id, controller: id }); if (id === PARTY.id) pPublish(); pRender(); pSheetRefresh(); }
+
+/** Called by the player: follow whoever's in control. */
+function pSync() {
+  const v = PLAYER.v, r = PARTY.remote;
+  if (!v || !PARTY.code || isCtl() || PARTY.detached || !r || reqKey(PLAYER.req) !== pKey(PARTY.title) || v.readyState < 2) { if (v && PARTY.code && !isCtl() && !r) v.playbackRate = 1; return; }
+  const mine = () => { PARTY.applyUntil = Date.now() + 700; };   // only our own changes are marked
+  if (r.playing && v.paused) { mine(); v.play().catch(() => {}); } else if (!r.playing && !v.paused) { mine(); v.pause(); }
+  const exp = pExpected(), diff = exp - v.currentTime * 1000;
+  if (Math.abs(diff) > 2500) { mine(); v.currentTime = Math.max(0, exp / 1000); v.playbackRate = r.rate; }
+  else if (r.playing && Math.abs(diff) > 250) v.playbackRate = r.rate * (diff > 0 ? 1.05 : .95);
+  else v.playbackRate = r.rate;
+}
+function pLocal() { if (!PARTY.code || Date.now() < PARTY.applyUntil || (PLAYER.v && PLAYER.v.readyState < 3 && !isCtl())) return; if (isCtl()) pPublish(); else if (PARTY.remote) { PARTY.detached = true; pRender(); } }
+
+async function pOpenTitle(t) {
+  if (isCtl() || PARTY.opening === pKey(t)) return;
+  PARTY.opening = pKey(t);
+  try {
+    let imdb = t.imdbId;
+    if (!imdb) { const d = await api.details(t.type, t.tmdbId).catch(() => null); imdb = d && (d.imdb_id || d.external_ids?.imdb_id); }
+    const streams = imdb ? await getStreams(t.type, imdb, t.season ?? undefined, t.episode ?? undefined).catch(() => []) : [];
+    const pick = streams.find(s => s.addon === t.addon) || streams[0];
+    if (pKey(PARTY.title) !== pKey(t) || !PARTY.code) return;
+    const base = { title: t.title, subtitle: t.subtitle, type: t.type, id: t.tmdbId, imdb, season: t.season ?? undefined, episode: t.episode ?? undefined, poster: t.poster, backdrop: t.backdrop };
+    const req = pick ? Object.assign(base, { url: pick.url, addon: pick.addon }) : t.url ? Object.assign(base, { url: t.url, addon: t.addon }) : null;
+    if (!req) return toast('None of your add-ons has this title — ask the host to share their stream');
+    req.start = pExpected();
+    PLAYER.req = req;
+    PARTY.applyUntil = Date.now() + 8000;   // the player's own start-up play/seek is not "you paused"
+    if (location.hash !== '#/play') location.hash = '#/play';
+    openPlayer();
+  } finally { PARTY.opening = null; }
+}
+
+// ---- party UI (player overlay + sheet + floating reactions)
+function pFloat(emoji, name) {
+  const host = PLAYER.el || document.body;
+  const f = document.createElement('div'); f.className = 'p-react';
+  f.style.setProperty('--x', (Math.random() * 60 - 30) + 'px');
+  f.innerHTML = `<span>${esc(String(emoji || '').slice(0, 8))}</span><small>${esc(name || '')}</small>`;
+  host.appendChild(f); setTimeout(() => f.remove(), 2700);
+}
+function pRender() {
+  // badge on the player's party button
+  const b = $('#pparty'); if (b) b.dataset.badge = PARTY.code ? (PARTY.unread || PARTY.members.length || '') : '';
+  const el = PLAYER.el;
+  let ov = $('#pov');
+  if (!el || !PARTY.code) { ov?.remove(); pPill(); return; }
+  if (!ov) { ov = document.createElement('div'); ov.id = 'pov'; ov.className = 'p-ov'; el.appendChild(ov); }
+  const recent = PARTY.chat.filter(c => Date.now() - c.at < 8000).slice(-3);
+  ov.innerHTML = `<div class="p-who"><i class="${PARTY.connected ? 'on' : ''}"></i>🎉 ${esc(PARTY.code)} · ${PARTY.members.length}${PARTY.controllerId ? ` <small>🎮 ${esc(isCtl() ? T('you') : pName(PARTY.controllerId))}</small>` : ''}</div>
+    <div class="p-chat">${recent.map(c => `<div><b>${esc(c.mine ? T('You') : c.name)}</b> ${esc(c.text)}</div>`).join('')}</div>
+    ${PARTY.detached && !isCtl() ? `<button class="p-sync" id="psync">${ic('sync')}${T('Back in sync with the party')}</button>` : ''}
+    ${isHost() && PARTY.requests.length ? `<div class="p-ask">🎮 ${esc(PARTY.requests[PARTY.requests.length - 1].name)} ${T('asks for control')} <button id="pallow">${T('Allow')}</button></div>` : ''}`;
+  $('#psync', ov)?.addEventListener('click', e => { e.stopPropagation(); PARTY.detached = false; pSync(); pRender(); });
+  $('#pallow', ov)?.addEventListener('click', e => { e.stopPropagation(); partyGive(PARTY.requests[PARTY.requests.length - 1].id); });
+  pPill();
+}
+setInterval(() => { if (PARTY.code && PLAYER.el) pRender(); }, 2000);   // let chat bubbles fade
+function pPill() {
+  let pill = $('#ppill');
+  if (!PARTY.code || PLAYER.el) { pill?.remove(); return; }
+  if (!pill) { pill = document.createElement('div'); pill.id = 'ppill'; pill.className = 'party-pill'; document.body.appendChild(pill); }
+  pill.innerHTML = `🎉 ${T('Watch party')} ${esc(PARTY.code)} · ${PARTY.members.length}<button id="ppopen">${T('Open')}</button><button id="ppx" aria-label="${T('Leave party')}">✕</button>`;
+  $('#ppopen', pill).onclick = () => PARTY.title ? pOpenTitle(PARTY.title) : toast('Waiting for the host to start playing…');
+  $('#ppx', pill).onclick = () => partyLeave();
+}
+function pSheetRefresh() { if ($('.sheet.party')) partySheet(); }
+function partySheet() {
+  const r = PLAYER.req, can = r && r.id && r.type && !r.local && !r.live;
+  PARTY.unread = 0;
+  const dev = d => d === 'tv' ? '📺' : d === 'web' ? '🌐' : '📱';
+  const body = !PARTY.code ? `<div class="pbody">
+      <p class="dim">${T("Watch together in sync. Everyone plays from their own add-ons; the host's stream is shared as a backup.")}</p>
+      <button class="btn acc" id="pcreate" ${can ? '' : 'disabled'}>${T('Start a watch party')}</button>
+      <b>${T('Join with a code')}</b><form id="pjoin" class="prow"><input class="field" id="pjc" placeholder="ABC123" maxlength="8" autocapitalize="characters" autocomplete="off"><button class="btn tonal">${T('Join')}</button></form></div>`
+    : `<div class="pbody">
+      <div class="pcode"><div><small class="dim">${T('Party code')}</small><b>${esc(PARTY.code.replace(/(.{3})/, '$1 '))}</b><small class="acc">${isHost() ? T("You're the host") : T('Host') + ': ' + esc(pName(PARTY.hostId))}</small></div>
+        ${window.qrcode ? (() => { const q = qrcode(0, 'M'); q.addData(inviteUrl()); q.make(); return `<span class="pqr">${q.createSvgTag({ cellSize: 3, margin: 2, scalable: true })}</span>`; })() : ''}</div>
+      <button class="btn tonal" id="pshare">${ic('open')}${T('Share invite')}</button>
+      <div class="preacts">${REACTS.map(e => `<button data-re="${e}">${e}</button>`).join('')}</div>
+      ${isHost() ? PARTY.requests.map(m => `<div class="preq">${esc(m.name)} ${T('asks for control')} <button data-give="${esc(m.id)}">${T('Allow')}</button></div>`).join('') : ''}
+      <small class="dim">${T('Watching')} · ${PARTY.members.length}</small>
+      ${PARTY.members.map(m => `<div class="pmem"><span class="av">${esc(m.name.slice(0, 1).toUpperCase())}</span><div><b>${esc(m.name)}${m.id === PARTY.id ? ` (${T('you')})` : ''}</b>
+        <small>${dev(m.device)} ${m.id === PARTY.hostId ? `<em>${T('Host')}</em>` : ''} ${m.id === PARTY.controllerId ? `<em class="g">🎮 ${T('In control')}</em>` : ''}</small></div>
+        ${isHost() && m.id !== PARTY.id ? `<button data-give="${esc(m.id === PARTY.controllerId ? PARTY.id : m.id)}">${T(m.id === PARTY.controllerId ? 'Take back' : 'Give control')}</button>` : ''}</div>`).join('')}
+      ${!isCtl() ? `<button class="btn outline" id="pask" ${PARTY.asked ? 'disabled' : ''}>${T(PARTY.asked ? 'Asked the host…' : 'Ask for control')}</button>` : ''}
+      ${isHost() ? `<div class="set-row" style="padding:0"><div><b>${T('Share my stream as a backup')}</b><small>${T("For friends whose add-ons can't find this title")}</small></div><button class="switch ${PARTY.shareStream ? 'on' : ''}" id="pss"></button></div>` : ''}
+      <small class="dim">${T('Chat')}</small>
+      <div class="pchat-list">${PARTY.chat.map(c => `<div class="${c.mine ? 'me' : ''}">${c.mine ? '' : `<b>${esc(c.name)}</b>`}<span>${esc(c.text)}</span></div>`).join('') || `<p class="dim">${T('Say hi 👋')}</p>`}</div>
+      <div class="pquick">${QUICK_MSGS.map((m, i) => `<button data-q="${i}">${T(m)}</button>`).join('')}</div>
+      <form id="pmsg" class="prow"><input class="field" id="pmt" placeholder="${T('Message')}" maxlength="300" autocomplete="off"><button class="btn acc">${T('Send')}</button></form>
+      <button class="btn outline danger" id="pleave">${T('Leave party')}</button></div>`;
+  const root = sheet('Watch party', [], body);
+  $('.sheet', root).classList.add('party');
+  const L = $('.pchat-list', root); if (L) L.scrollTop = L.scrollHeight;
+  $('#pcreate', root)?.addEventListener('click', () => { partyCreate(); partySheet(); });
+  $('#pjoin', root)?.addEventListener('submit', e => { e.preventDefault(); partyJoin($('#pjc', root).value); partySheet(); });
+  $('#pshare', root)?.addEventListener('click', () => { const text = T('Join my Lumio watch party') + ': ' + PARTY.code; if (navigator.share) navigator.share({ title: 'Lumio', text, url: inviteUrl() }).catch(() => {}); else navigator.clipboard?.writeText(text + '\n' + inviteUrl()).then(() => toast('Link copied')); });
+  root.querySelectorAll('[data-re]').forEach(b => b.onclick = () => partyReact(b.dataset.re));
+  root.querySelectorAll('[data-give]').forEach(b => b.onclick = () => partyGive(b.dataset.give));
+  $('#pask', root)?.addEventListener('click', () => { PARTY.asked = true; pCast('ask', { from: PARTY.id, name: myName() }); partySheet(); });
+  $('#pss', root)?.addEventListener('click', () => { PARTY.shareStream = !PARTY.shareStream; pPublish(); partySheet(); });
+  root.querySelectorAll('[data-q]').forEach(b => b.onclick = () => partyChat(T(QUICK_MSGS[+b.dataset.q])));
+  $('#pmsg', root)?.addEventListener('submit', e => { e.preventDefault(); const i = $('#pmt', root); partyChat(i.value); i.value = ''; });
+  $('#pleave', root)?.addEventListener('click', () => { partyLeave(); closeSheet(); });
+}
+/** "#/party/CODE" invite links (and the Settings join box). */
+function partyView(code) {
+  renderNav(null);
+  if (code) partyJoin(code);
+  view.innerHTML = `<div class="gutter" style="padding-top:calc(30px + var(--safe-t))"><h1 class="page-title" style="padding-top:0">🎉 ${T('Watch party')}</h1>
+    <div class="card"><div class="set-row" style="display:block"><b>${PARTY.code ? T('Joining party') + ' ' + esc(PARTY.code) + '…' : T('Join with a code')}</b>
+      <small>${T('Waiting for the host to start playing…')}</small>
+      <form id="pjoin2" class="prow" style="padding-top:12px"><input class="field" id="pjc2" placeholder="ABC123" value="${esc(PARTY.code || '')}" maxlength="8" autocapitalize="characters"><button class="btn acc">${T('Join')}</button></form></div></div></div>`;
+  $('#pjoin2').onsubmit = e => { e.preventDefault(); partyJoin($('#pjc2').value); partyView(); };
+}
+
 // ============================================================================ boot
 CD = raw.get(cacheKey(), {}) || {};
 if (SESSION) loadSyncState();
@@ -1803,6 +2111,7 @@ if (SESSION) { PROFILE_ID = raw.get('lumio.activeProfile.' + SESSION.uid, MAIN);
 loadProfileData();
 applyTheme(); applyLang();
 if (location.hash === '#/play') history.replaceState(null, '', '#/home');
+let PENDING_PARTY = (location.hash.match(/^#\/party\/([A-Za-z0-9]{4,8})/) || [])[1] || null;
 if (location.hash.startsWith('#/tv')) tvLinkView();   // opened from the QR code on Lumio TV
 else if (!SESSION) loginView();
 else {

@@ -622,3 +622,48 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .ap-preview .bar { width: 36px; height: 3px; border-radius: 3px; background: var(--accent); margin: 6px 0; }
 .ap-preview .pill { display: inline-block; padding: 6px 14px; border-radius: 99px; font-size: 13px; font-weight: 700; background: var(--accent); color: #fff; margin-inline-end: 8px; }
 .ap-preview .pill.alt { background: rgba(255,255,255,.12); font-weight: 500; }
+
+/* ---------------- Watch party */
+.pparty { position: relative; }
+.pparty[data-badge]:not([data-badge=""])::after { content: attr(data-badge); position: absolute; top: 2px; inset-inline-end: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+.p-ov { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.p-ov > * { pointer-events: auto; }
+.p-who { position: absolute; top: calc(70px + var(--safe-t)); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 99px; background: rgba(0,0,0,.55); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.p-who i { width: 8px; height: 8px; border-radius: 50%; background: #F59E0B; } .p-who i.on { background: #22C55E; }
+.p-who small { color: var(--dim); font-weight: 500; }
+.p-chat { position: absolute; inset-inline-start: 16px; top: 50%; transform: translateY(-50%); display: grid; gap: 6px; max-width: min(320px, 70vw); pointer-events: none; }
+.p-chat div { padding: 7px 12px; border-radius: 14px; background: rgba(0,0,0,.6); font-size: 13px; animation: fly .3s ease; }
+.p-chat b { color: var(--accent); margin-inline-end: 4px; }
+.p-sync { position: absolute; bottom: calc(130px + var(--safe-b)); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 12px 20px; border-radius: 99px; background: #fff; color: #000; font-weight: 700; border: 0; }
+.p-sync svg { width: 20px; height: 20px; }
+.p-ask { position: absolute; top: calc(70px + var(--safe-t)); inset-inline-end: 16px; padding: 8px 8px 8px 14px; border-radius: 14px; background: rgba(0,0,0,.75); font-size: 13px; }
+.p-ask button, .preq button, .pmem button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 6px 10px; }
+.p-react { position: absolute; bottom: 140px; inset-inline-end: 60px; display: grid; justify-items: center; pointer-events: none; z-index: 4; animation: preact 2.6s linear forwards; }
+.p-react span { font-size: 34px; } .p-react small { font-size: 10px; opacity: .8; }
+@keyframes preact { 0% { transform: translate(var(--x), 0) scale(.8); opacity: 0; } 10% { opacity: 1; transform: translate(var(--x), -20px) scale(1.15); } 100% { transform: translate(calc(var(--x) + 12px), -300px) scale(.9); opacity: 0; } }
+.party-pill { position: fixed; top: calc(10px + var(--safe-t)); left: 50%; transform: translateX(-50%); z-index: 50; display: flex; gap: 6px; align-items: center; padding: 4px 4px 4px 14px; border-radius: 99px; background: rgba(18,18,24,.92); border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.party-pill button { background: none; border: 0; color: var(--accent); font-weight: 700; padding: 6px 10px; }
+.party-pill #ppx { color: var(--dim); }
+.sheet.party { max-height: 86vh; overflow-y: auto; }
+.pbody { display: grid; gap: 12px; padding: 4px 20px 18px; }
+.prow { display: flex; gap: 8px; } .prow .field { flex: 1; text-transform: uppercase; }
+#pmsg .field { text-transform: none; }
+.pcode { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; background: rgba(255,255,255,.06); }
+.pcode > div { flex: 1; display: grid; } .pcode b { font-size: 30px; font-weight: 900; letter-spacing: 2px; } .pcode .acc { color: var(--accent); }
+.pqr { width: 104px; height: 104px; background: #fff; border-radius: 10px; padding: 4px; display: block; } .pqr svg { width: 100%; height: 100%; }
+.preacts { display: flex; justify-content: space-between; } .preacts button { width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(255,255,255,.08); font-size: 22px; }
+.preq { padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 18%, transparent); display: flex; align-items: center; justify-content: space-between; }
+.pmem { display: flex; align-items: center; gap: 10px; } .pmem > div { flex: 1; display: grid; } .pmem small { color: var(--dim); }
+.pmem em { font-style: normal; color: var(--accent); font-weight: 700; font-size: 11px; } .pmem em.g { color: #22C55E; }
+.pmem .av { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: color-mix(in srgb, var(--accent) 25%, transparent); }
+.pchat-list { display: grid; gap: 6px; max-height: 220px; overflow-y: auto; }
+.pchat-list div { display: grid; justify-items: start; } .pchat-list div.me { justify-items: end; }
+.pchat-list b { color: var(--accent); font-size: 11px; } .pchat-list span { padding: 7px 12px; border-radius: 14px; background: rgba(255,255,255,.08); }
+.pchat-list .me span { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.pquick { display: flex; flex-wrap: wrap; gap: 8px; } .pquick button { border: 0; border-radius: 99px; padding: 7px 12px; background: rgba(255,255,255,.1); color: #fff; font-size: 13px; }
+.btn.danger { color: #FF6B6B; border-color: rgba(255,107,107,.4); }
+.sheet.party .pbody { display: grid !important; grid-template-columns: minmax(0, 1fr); gap: 12px; flex-direction: column; }
+.sheet.party .pbody > * { min-width: 0; }
+.sheet.party .btn { width: 100%; justify-content: center; }
+.sheet.party .prow .btn { width: auto; }
+.sheet.party .pmem button, .sheet.party .preq button { width: auto; }
