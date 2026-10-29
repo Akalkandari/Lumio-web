@@ -1898,10 +1898,16 @@ function profileEditor(orig, isNew) {
  * coloured icon, title, summary and chevron) and one page per topic at #/settings/<page>.
  */
 let SET_PAGE = null;
+// Android / desktop Chrome: keep the browser's install prompt so "Install Lumio" is one tap
+let INSTALL_PROMPT = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); INSTALL_PROMPT = e; });
+window.addEventListener('appinstalled', () => { INSTALL_PROMPT = null; toast('Lumio installed'); });
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isIOSSafari = () => isIOS() && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent);
 const SET_PAGES = {
   account: ['Account', 'user', '#3B82F6'], party: ['Watch party', 'group', '#EC4899'], language: ['Language', 'lang', '#0EA5E9'],
   content: ['Catalog & region', 'movie', '#F59E0B'], addons: ['Stream addons', 'ext', '#8B5CF6'], playback: ['Playback', 'playC', '#22C55E'],
-  install: ['Install on iPhone', 'phone', '#14B8A6'], about: ['About Lumio', 'info', '#64748B'],
+  install: ['Install the app', 'phone', '#14B8A6'], about: ['About Lumio', 'info', '#64748B'],
 };
 function settingsView(page) {
   if (page !== undefined) SET_PAGE = page || null;
@@ -1937,7 +1943,7 @@ function settingsSummary(k) {
     case 'content': return `TMDB · ${T('region')} ${S.region}`;
     case 'addons': return `${S.addons.filter(a => a.enabled !== false).length}/${S.addons.length} ${T('on')} · ${T('Configure, order and switch off')}`;
     case 'playback': return T('Player, subtitles, skipping and auto-play');
-    case 'install': return T('Add Lumio to your Home Screen');
+    case 'install': return T(isIOS() ? 'One tap, then confirm in Settings' : 'Add Lumio to your Home Screen');
     default: return T('Version and this browser');
   }
 }
@@ -1978,13 +1984,39 @@ function settingsPage(page, standalone) {
       <div class="set-row"><div><b>${T("Auto-play next episode")}</b></div>${sw('autoNext', S.autoNext)}</div>
       <div class="set-row" style="display:block"><b>${T('Subtitle size')}: <span id="ssv">${Math.round(S.subScale * 100)}%</span></b><input type="range" id="subScale" min="0.6" max="2" step="0.1" value="${S.subScale}"></div>
       <div class="set-row" style="display:block"><b>${T("Preferred subtitle language")}</b><small>${T("ISO code, e.g. en, ar")}</small><input class="field" id="subLang" style="margin-top:8px" maxlength="3" value="${esc(S.subLang)}"></div></div>`;
-    case 'install': return `<div class="card"><div class="set-row"><div><b>${T("Add Lumio to your Home Screen")}</b><small>${T("In Safari, tap the Share button, then “Add to Home Screen”. Lumio then opens full-screen like an app.")}</small></div></div></div>`;
+    case 'install': return installPage();
     default: return `<div class="card"><div class="set-row"><span class="pin-ic">${ic('info')}</span><div><b>Lumio web</b><small>${T('Version')} ${esc((document.querySelector('script[src^="app.js"]')?.getAttribute('src') || '').split('v=')[1] || '')}</small></div></div>
       <div class="set-row"><div><b>${T('This browser')}</b><small>${esc(navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 120))}</small></div></div>
       <div class="set-row"><div><small>${T('Works best in Safari on iPhone. HDR & Dolby Vision play natively on supported iPhones for HLS/MP4 streams.')}</small></div></div></div>`;
   }
 }
+/** Settings → Install the app. iPhone: a one-tap installer profile (Settings → Install). Android/desktop: the browser's own install. */
+function installPage() {
+  const icon = `<img class="inst-ic" src="${iconURL(S.iconColor || 'classic', 120)}" alt="">`;
+  const steps = list => `<ol class="inst-steps">${list.map(([e, t, d]) => `<li><span class="n">${e}</span><div><b>${T(t)}</b>${d ? `<small>${T(d)}</small>` : ''}</div></li>`).join('')}</ol>`;
+  if (isIOS() && !isIOSSafari()) return `<div class="card inst">${icon}<h2>${T('Open this page in Safari')}</h2>
+    <p class="dim">${T('iPhone only installs apps from Safari. Copy the link, open Safari and paste it, then come back here.')}</p>
+    <button class="btn acc big" id="instcopy">${ic('link')}${T('Copy link')}</button></div>`;
+  if (isIOS()) return `<div class="card inst">${icon}<h2>${T('Install Lumio on your iPhone')}</h2>
+      <p class="dim">${T('Lumio opens full-screen from your Home Screen like a real app — with the icon you picked in Appearance.')}</p>
+      <a class="btn acc big" id="instgo" href="install/lumio-${esc(S.iconColor || 'classic')}.mobileconfig">${ic('phone')}${T('Install Lumio')}</a></div>
+    <div class="card inst-how" id="insthow">${steps([
+      ['1', 'Tap “Allow”', 'Safari asks to download a configuration profile.'],
+      ['2', 'Open the Settings app', 'Tap “Profile Downloaded” at the top (or General → VPN & Device Management).'],
+      ['3', 'Tap “Install”', 'Enter your passcode and tap Install again. It only adds the Lumio icon.'],
+      ['✓', 'Open Lumio from your Home Screen', 'Sign in once inside the app.']])}</div>
+    <details class="card inst-alt"><summary>${T('Prefer the classic way?')}</summary>${steps([
+      ['1', 'Tap the Share button in Safari', null], ['2', 'Choose “Add to Home Screen”', null], ['3', 'Tap “Add”', null]])}</details>`;
+  return `<div class="card inst">${icon}<h2>${T('Install Lumio')}</h2>
+    <p class="dim">${T('Opens in its own window from your home screen or desktop, like a real app.')}</p>
+    ${INSTALL_PROMPT ? `<button class="btn acc big" id="instprompt">${ic('phone')}${T('Install Lumio')}</button>`
+      : `<p class="dim" style="font-size:13px">${T('In Chrome or Edge: open the browser menu (⋮) and choose “Install app” or “Add to Home screen”.')}</p>`}</div>`;
+}
+
 function bindSettings(page) {
+  $('#instgo')?.addEventListener('click', () => setTimeout(() => $('#insthow')?.classList.add('lit'), 600));
+  $('#instcopy')?.addEventListener('click', () => { navigator.clipboard?.writeText(location.origin + location.pathname).then(() => toast('Link copied'), () => toast('Copy failed')); });
+  $('#instprompt')?.addEventListener('click', async () => { const p = INSTALL_PROMPT; if (!p) return; p.prompt(); const r = await p.userChoice.catch(() => null); INSTALL_PROMPT = null; if (r?.outcome === 'accepted') toast('Lumio installed'); settingsView(); });
   const re = () => settingsView();
   const on = (sel, ev, fn) => { const el = $(sel); if (el) el[ev] = fn; };
   on('#signout', 'onclick', signOut);
