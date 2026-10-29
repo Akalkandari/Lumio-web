@@ -95,7 +95,7 @@ const FRANCHISES = [
   ['f_rocky', 'Rocky & Creed', '#B0302A', '#120404', 'flash', [1575, 553717], null],
   ['f_godfather', 'The Godfather', '#4A3424', '#050302', 'candle', [230], null],
   ['f_madmax', 'Mad Max', '#C2681D', '#1F0E02', 'sand', [8945], null],
-  ['f_monsterverse', 'MonsterVerse', '#1E4B5E', '#02090D', 'roar', [535313], null],
+  ['f_monsterverse', 'Godzilla', '#1E4B5E', '#02090D', 'roar', [535313], null],
   ['f_apes', 'Planet of the Apes', '#5E5A2A', '#0D0C04', 'dust', [173710], null],
   ['f_hunger', 'The Hunger Games', '#B5491B', '#140602', 'ember', [131635], null],
   ['f_twilight', 'Twilight', '#3D4B5C', '#05070A', 'mist', [33514], null],
@@ -151,7 +151,7 @@ const DISCOVER = [
 const SORTS = [['popular', 'Popular', 'popularity.desc', 'popularity.desc'], ['top', 'Top Rated', 'vote_average.desc', 'vote_average.desc'], ['new', 'Newest', 'primary_release_date.desc', 'first_air_date.desc']];
 const ORDER_SORT = ['order', 'Release order', 'primary_release_date.asc', 'first_air_date.asc'];
 const decadeQuery = d => { const today = new Date().toISOString().slice(0, 10), end = `${d.from + 9}-12-31`; return `primary_release_date.gte=${d.from}-01-01&primary_release_date.lte=${end > today ? today : end}&vote_count.gte=150`; };
-const franchiseQuery = f => f.cos ? `with_companies=${f.cos}&vote_count.gte=150` : '';
+const franchiseQuery = f => f.cos ? `with_companies=${f.cos}&vote_count.gte=150&primary_release_date.lte=${new Date().toISOString().slice(0, 10)}` : '';
 /** Franchise backdrop / studio logo path from TMDB, remembered in this browser. */
 let ART_ = null; const artCache = () => ART_ || (ART_ = raw.get('tile_art', {}));
 async function tileArt(key) {
@@ -539,7 +539,8 @@ const api = {
   /** Every film of these TMDB collections (a saga), de-duplicated. */
   async parts(ids) {
     const all = (await Promise.all(ids.map(id => api.collection(id).then(r => r.parts || []).catch(() => [])))).flat();
-    const seen = new Set(); return all.filter(x => x.release_date && !seen.has(x.id) && seen.add(x.id)).map(x => Object.assign(x, { media_type: 'movie' }));
+    const seen = new Set(); const today = new Date().toISOString().slice(0, 10);
+    return all.filter(x => x.release_date && x.release_date <= today && !seen.has(x.id) && seen.add(x.id)).map(x => Object.assign(x, { media_type: 'movie' }));
   },
   recs: (type, id) => tmdb(`${type}/${id}/recommendations`).then(r => typed(r.results, type)).catch(() => []),
   discover(type, query, sort, page) {
@@ -791,7 +792,7 @@ function catalogInfo(kind, key) {
   if (kind === 'service') { const s = SERVICES.find(x => x.key === key); return s && { title: s.name, sub: `Streaming now on ${s.name}`, service: s, c1: s.c1, c2: s.c2, sortable: true }; }
   if (kind === 'world') { const w = WORLD.find(x => x.key === key); return w && { title: w.name, sub: w.tq ? 'Series everyone is watching' : 'The best films', scene: 'tv_' + w.scene, c1: w.c1, c2: w.c2, mq: w.mq, tq: w.tq, sortable: true }; }
   if (kind === 'franchise') { const f = FRANCHISES.find(x => x.key === key); return f && { title: f.name, sub: 'Every film, in release order', franchise: f, scene: 'fx_' + f.fx, c1: f.c1, c2: f.c2, mq: franchiseQuery(f), tq: null, sortable: true, sorts: [ORDER_SORT, ...SORTS] }; }
-  if (kind === 'studio') { const st = STUDIOS.find(x => x.key === key); return st && { title: st.name, studio: st, scene: 'fx_' + st.fx, c1: st.c1, c2: st.c2, mq: `with_companies=${st.cos}&vote_count.gte=50`, tq: null, sortable: true }; }
+  if (kind === 'studio') { const st = STUDIOS.find(x => x.key === key); return st && { title: st.name, studio: st, scene: 'fx_' + st.fx, c1: st.c1, c2: st.c2, mq: `with_companies=${st.cos}&vote_count.gte=50&primary_release_date.lte=${new Date().toISOString().slice(0, 10)}`, tq: null, sortable: true }; }
   if (kind === 'decade') { const d = DECADES.find(x => x.key === key); return d && { title: d.label, decade: d, scene: 'dec_' + d.key, c1: d.c1, c2: d.c2, mq: decadeQuery(d), tq: null, sortable: true }; }
   const g = GENRES.find(x => x.key === key); return g && { title: g.name, sub: `The best ${g.name.toLowerCase()} titles`, genre: g.key, c1: g.c1, c2: g.c2, mq: g.mq, tq: g.tq, sortable: true };
 }

@@ -691,7 +691,7 @@ window.LUMIO_AR = {
 "Rocky & Creed": "روكي وكريد",
 "The Godfather": "العرّاب",
 "Mad Max": "ماد ماكس",
-"MonsterVerse": "عالم الوحوش",
+"Godzilla": "غودزيلا",
 "Planet of the Apes": "كوكب القردة",
 "The Hunger Games": "مباريات الجوع",
 "Twilight": "الشفق",
