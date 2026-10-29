@@ -671,8 +671,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 /* ---------------- Home → Franchises / Production Studios / Decades */
 .tile.fr { width: 200px; height: 112px; }
 .tile.st { width: 164px; height: 90px; }
-.tile.dec { width: 132px; height: 80px; }
-@media (min-width: 700px) { .tile.fr { width: 236px; height: 132px; } .tile.st { width: 196px; height: 108px; } .tile.dec { width: 156px; height: 94px; } }
+.tile.dec { width: 168px; height: 96px; }
+.tile.discover.ph { width: 200px; height: 112px; }
+.tile.genre.ph { width: 156px; height: 88px; }
+.tile.ph .scrim { background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,.72)); }
+.tile.ph .lbl b, .tile.ph .lbl small { text-shadow: 0 2px 8px rgba(0,0,0,.85); }
+.tile .era { position: absolute; inset: 0; }
+.era-fx { opacity: .55; }
+@media (min-width: 700px) { .tile.fr { width: 236px; height: 132px; } .tile.st { width: 196px; height: 108px; } .tile.dec { width: 200px; height: 112px; } .tile.discover.ph { width: 236px; height: 132px; } .tile.genre.ph { width: 184px; height: 104px; } }
 img.kb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; animation: kenburns 16s ease-in-out infinite alternate; will-change: transform; }
 img.kb.ok { opacity: 1; }
 @keyframes kenburns { 0% { transform: scale(1.12) translate(3%, 0); } 50% { transform: scale(1.17) translate(-3%, 2%); } 100% { transform: scale(1.1) translate(1%, -2%); } }

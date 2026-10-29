@@ -193,7 +193,32 @@ async function fillArt(el) {
 const franchiseTile = (f, i) => `<a class="tile fr" href="#/catalog/franchise/${f.key}" style="${tileStyle(f.c1, f.c2, i)}"><img class="kb" data-art="${f.key}" alt="" style="animation-delay:-${(i * 1.3) % 16}s" onload="this.classList.add('ok')"><i class="scrim"></i><canvas data-scene="fx_${f.fx}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(f.name))}</b></span></a>`;
 const studioTile = (st, i) => `<a class="tile st" href="#/catalog/studio/${st.key}" style="${tileStyle(st.c1, st.c2, i)}" aria-label="${esc(st.name)}"><canvas data-scene="fx_${st.fx}" data-i="${i}"></canvas><span class="slogo" data-art="${st.key}" style="animation-delay:-${(i * .37) % 4}s"><i></i><b>${esc(st.name)}</b></span></a>`;
 const decadeLabel = (d, big) => `<span class="dlbl ${d.key}${big ? ' big' : ''}"><b>${d.label}</b>${S.lang === 'ar' ? `<small>${esc(T(d.label))}</small>` : ''}</span>`;
-const decadeTile = (d, i) => `<a class="tile dec" href="#/catalog/decade/${d.key}" style="${tileStyle(d.c1, d.c2, i)}"><canvas data-scene="dec_${d.key}" data-i="${i}"></canvas>${decadeLabel(d)}</a>`;
+const decadeTile = (d, i) => `<a class="tile dec ph" href="#/catalog/decade/${d.key}" style="${tileStyle(d.c1, d.c2, i)}">${photoBits('decades', d.key, null, i)}<i class="era" style="background:linear-gradient(135deg, ${d.c1}73, transparent, ${d.c2}8c)"></i><canvas class="era-fx" data-scene="dec_${d.key}" data-i="${i}"></canvas>${decadeLabel(d)}</a>`;
+/** Discover / Genres / Decades tiles: the category's most iconic film (most-voted on TMDB, or today's #1), never twice in a row. */
+const GENRE_FX = { action: 'ember', adventure: 'dust', comedy: 'bubbles', drama: 'candle', scifi: 'hyperspace', horror: 'fog', thriller: 'spotlight', anime: 'petals', animation: 'arc', family: 'stars',
+  romance: 'hearts', crime: 'siren', mystery: 'mist', fantasy: 'magic', documentary: 'globe', war: 'searchlights', history: 'grain', western: 'sand', music: 'music', reality: 'flash', kids: 'bubbles' };
+const DISCOVER_FX = { foryou: 'magic', trending: 'ember', popular: 'flash', top_rated: 'rays' };
+const photoBits = (row, key, fx, i) => `<img class="kb" data-row="${row}" data-key="${key}" alt="" style="animation-delay:-${(i * 1.3) % 16}s" onload="this.classList.add('ok')"><i class="scrim"></i>${fx ? `<canvas data-scene="fx_${fx}" data-i="${i}"></canvas>` : ''}`;
+const ROWART = {};
+function rowArt(row) {
+  const all = raw.get('row_art', {}), c = all[row], ttl = row === 'discover' ? 12 * 3600e3 : 14 * 86400e3;
+  if (c && Date.now() - c.at < ttl) return Promise.resolve(c.map);
+  return ROWART[row] || (ROWART[row] = (async () => {
+    const picks = row === 'discover' ? [['foryou', async () => { const s = LIB.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0]; return [...(s ? await api.recs(s.type, s.id) : []), ...await api.trending('all', 'day')]; }],
+        ['trending', () => api.trending('all', 'week')], ['popular', () => api.list('movie', 'popular')], ['top_rated', () => api.list('movie', 'top_rated')]]
+      : row === 'genres' ? GENRES.map(g => [g.key, () => api.discover(g.mq != null ? 'movie' : 'tv', (g.mq != null ? g.mq : g.tq) || '', 'vote_count.desc', 1)])
+      : DECADES.map(d => [d.key, () => api.discover('movie', decadeQuery(d), 'vote_count.desc', 1)]);
+    const lists = await Promise.all(picks.map(([, f]) => f().catch(() => [])));
+    const used = new Set(), map = {};
+    picks.forEach(([k], i) => { const x = (lists[i] || []).find(m => m.backdrop_path && !used.has(m.id)); if (x) { used.add(x.id); map[k] = x.backdrop_path; } });
+    if (Object.keys(map).length) { const a = raw.get('row_art', {}); a[row] = { at: Date.now(), map }; raw.set('row_art', a); }
+    return Object.keys(map).length ? map : (c ? c.map : {});
+  })());
+}
+function fillRowArt(root) {
+  ['discover', 'genres', 'decades'].forEach(row => { const imgs = root.querySelectorAll(`img[data-row="${row}"]`); if (!imgs.length) return;
+    rowArt(row).then(map => imgs.forEach(im => { const p = map[im.dataset.key]; if (p && !im.src) im.src = IMG + (im.dataset.size || 'w780') + p; })); });
+}
 
 // ============================================================================ icons
 const P = {
@@ -664,13 +689,11 @@ const tileStyle = (c1, c2, i) => `--c1:${c1};--c2:${c2};--ang:${120 + (i * 37) %
 
 function discoverSections() {
   return `${sectionH('Discover', 'Curated lists, updated daily')}
-  <div class="rail gutter">${DISCOVER.map((d, i) => `<a class="tile discover" href="#/catalog/discover/${d.key}" style="${tileStyle(d.c1, d.c2, i)}"><span class="emoji" style="animation-delay:${i * .3}s">${d.emoji}</span><span class="lbl"><b>${esc(T(d.name))}</b><small>${esc(T(d.sub))}</small></span></a>`).join('')}</div>
+  <div class="rail gutter">${DISCOVER.map((d, i) => `<a class="tile discover ph" href="#/catalog/discover/${d.key}" style="${tileStyle(d.c1, d.c2, i)}">${photoBits('discover', d.key, DISCOVER_FX[d.key], i)}<span class="emoji" style="animation-delay:${i * .3}s">${d.emoji}</span><span class="lbl"><b>${esc(T(d.name))}</b><small>${esc(T(d.sub))}</small></span></a>`).join('')}</div>
   ${sectionH('Streaming Services', 'Browse every catalog')}
   <div class="rail gutter" id="services-rail">${servicesHTML(SERVICES.filter(s => s.logo))}</div>
-  ${sectionH('Arabic & Turkish', 'Series and films from the region and beyond')}
-  <div class="rail gutter">${WORLD.map((w, i) => `<a class="tile genre tv world" href="#/catalog/world/${w.key}" style="${tileStyle(w.c1, w.c2, i)}"><canvas data-scene="tv_${w.scene}" data-i="${i}"></canvas><span class="lbl"><b>${w.emoji} ${esc(T(w.name))}</b></span></a>`).join('')}</div>
   ${sectionH('Genres', 'Something for every mood')}
-  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>
+  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre ph" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}">${photoBits('genres', g.key, GENRE_FX[g.key] || 'sheen', i)}<span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>
   ${sectionH('Franchises', 'Every saga, film by film')}
   <div class="rail gutter">${FRANCHISES.map(franchiseTile).join('')}</div>
   ${sectionH('Production Studios', 'The studios behind the movies')}
@@ -682,6 +705,7 @@ const servicesHTML = list => list.map((s, i) => `<a class="tile service" href="#
 function mountDiscover(root) {
   root.querySelectorAll('canvas[data-scene]').forEach(c => window.GenreScenes && GenreScenes.attach(c, c.dataset.scene, +c.dataset.i));
   root.querySelectorAll('[data-art]').forEach(el => artObserver ? artObserver.observe(el) : fillArt(el));
+  fillRowArt(root);
   loadServices().then(list => { const r = $('#services-rail', root); if (r) r.innerHTML = servicesHTML(list); });
 }
 
@@ -807,13 +831,13 @@ function libraryView(tab = 'watchlist') {
 
 // ============================================================================ catalog
 function catalogInfo(kind, key) {
-  if (kind === 'discover') { const d = DISCOVER.find(x => x.key === key); return d && { title: d.name, sub: d.sub, emoji: d.emoji, c1: d.c1, c2: d.c2, mq: '', tq: key === 'foryou' ? null : '', sortable: false }; }
+  if (kind === 'discover') { const d = DISCOVER.find(x => x.key === key); return d && { title: d.name, sub: d.sub, emoji: d.emoji, row: 'discover', scene: 'fx_' + DISCOVER_FX[key], c1: d.c1, c2: d.c2, mq: '', tq: key === 'foryou' ? null : '', sortable: false }; }
   if (kind === 'service') { const s = SERVICES.find(x => x.key === key); return s && { title: s.name, sub: `Streaming now on ${s.name}`, service: s, c1: s.c1, c2: s.c2, sortable: true }; }
   if (kind === 'world') { const w = WORLD.find(x => x.key === key); return w && { title: w.name, sub: w.tq ? 'Series everyone is watching' : 'The best films', scene: 'tv_' + w.scene, c1: w.c1, c2: w.c2, mq: w.mq, tq: w.tq, sortable: true }; }
   if (kind === 'franchise') { const f = FRANCHISES.find(x => x.key === key); return f && { title: f.name, sub: 'Every film, in release order', franchise: f, scene: 'fx_' + f.fx, c1: f.c1, c2: f.c2, mq: franchiseQuery(f), tq: null, sortable: true, sorts: [ORDER_SORT, ...SORTS] }; }
   if (kind === 'studio') { const st = STUDIOS.find(x => x.key === key); return st && { title: st.name, studio: st, scene: 'fx_' + st.fx, c1: st.c1, c2: st.c2, mq: `with_companies=${st.cos}&vote_count.gte=50&primary_release_date.lte=${new Date().toISOString().slice(0, 10)}`, tq: null, sortable: true }; }
-  if (kind === 'decade') { const d = DECADES.find(x => x.key === key); return d && { title: d.label, decade: d, scene: 'dec_' + d.key, c1: d.c1, c2: d.c2, mq: decadeQuery(d), tq: null, sortable: true }; }
-  const g = GENRES.find(x => x.key === key); return g && { title: g.name, sub: `The best ${g.name.toLowerCase()} titles`, genre: g.key, c1: g.c1, c2: g.c2, mq: g.mq, tq: g.tq, sortable: true };
+  if (kind === 'decade') { const d = DECADES.find(x => x.key === key); return d && { title: d.label, decade: d, row: 'decades', scene: 'dec_' + d.key, c1: d.c1, c2: d.c2, mq: decadeQuery(d), tq: null, sortable: true }; }
+  const g = GENRES.find(x => x.key === key); return g && { title: g.name, sub: `The best ${g.name.toLowerCase()} titles`, genre: g.key, row: 'genres', scene: 'fx_' + (GENRE_FX[g.key] || 'sheen'), c1: g.c1, c2: g.c2, mq: g.mq, tq: g.tq, sortable: true };
 }
 /** Actor / director page: photo, bio and every movie & series they're in. */
 async function personView(id, token) {
@@ -1040,7 +1064,7 @@ async function catalogView(kind, key, token) {
   const titleHTML = info.decade ? decadeLabel(info.decade, true) : `<h1>${esc(info.service || info.studio ? info.title : T(info.title))}</h1>`;
   const subText = info.studio ? `${T('Films from')} ${info.title}` : info.decade ? (S.lang === 'ar' ? `${T('The best films of the')} ${T(info.title)}` : `The best films of the ${info.title}`) : null;
   view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
-    <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.franchise ? `<img class="kb" id="bn-art" data-art="${info.franchise.key}" data-size="w1280" alt="" onload="this.classList.add('ok')"><i class="scrim"></i>` : ''}${info.genre || info.scene ? `<canvas id="bn-scene"></canvas>` : ''}${info.studio ? `<span class="slogo bn" data-art="${info.studio.key}"><i></i></span>` : ''}
+    <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.row ? `<img class="kb" data-row="${info.row}" data-key="${key}" data-size="w1280" alt="" onload="this.classList.add('ok')"><i class="scrim"></i>` : ''}${info.franchise ? `<img class="kb" id="bn-art" data-art="${info.franchise.key}" data-size="w1280" alt="" onload="this.classList.add('ok')"><i class="scrim"></i>` : ''}${info.genre || info.scene ? `<canvas id="bn-scene" class="${info.decade ? 'era-fx' : ''}"></canvas>` : ''}${info.studio ? `<span class="slogo bn" data-art="${info.studio.key}"><i></i></span>` : ''}
       <div class="ttl">${info.service ? logoHTML(info.service, 0, 58) : (!info.genre && info.emoji ? `<span style="font-size:44px" class="emoji-b">${info.emoji}</span>` : '')}
         <div>${titleHTML}<p>${esc(subText || (info.service ? `${T('Streaming now on')} ${info.title}` : info.genre ? (S.lang === 'ar' ? `أفضل عناوين ${T(info.title)}` : info.sub) : T(info.sub)))}</p></div></div></div>
     <div class="gutter">
@@ -1048,7 +1072,8 @@ async function catalogView(kind, key, token) {
       ${info.sortable ? `<div class="chips" id="sorts" style="padding-top:2px">${sorts.map(([k, l], i) => `<button class="chip sm ${i ? '' : 'on'}" data-s="${k}">${T(l)}</button>`).join('')}</div>` : ''}
       <div class="grid" id="cgrid" style="padding-top:12px"></div><div id="cmore" style="height:1px"></div>
     </div>`;
-  if (info.genre || info.scene) GenreScenes.attach($('#bn-scene'), info.genre || info.scene, 0);
+  if (info.genre || info.scene) GenreScenes.attach($('#bn-scene'), info.scene || info.genre, 0);
+  fillRowArt(view);
   view.querySelectorAll('.banner [data-art]').forEach(fillArt);
   const grid = $('#cgrid');
   const load = async () => {

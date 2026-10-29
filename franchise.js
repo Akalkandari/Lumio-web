@@ -51,6 +51,14 @@
       c.fillStyle = W(.1); for (let y = step / 2; y < h; y += step) for (let x = step / 2; x < w; x += step) { const r = step * .32 * Math.max(0, Math.min(1, 1 - Math.hypot(x - cx, y - cy) / M * 1.4)); if (r > .6) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); } }
       sweep(c, w, h, fract(v * 2), .28); },
     bolt,
+    hearts(c, w, h, v, s) { const u = Math.min(w, h); glow(c, w * .8, h * .3, u * .8, '#FF4D8D', .22 + .06 * sin(v * TAU * 2));
+      for (let i = 0; i < 12; i++) { const p = fract(v + s[i]), x = s[i + 6] * w + sin((v * 2 + s[i]) * TAU) * u * .08, y = h * (1.1 - 1.2 * p), r = u * (.05 + .05 * s[i + 12]);
+        c.beginPath(); c.moveTo(x, y + r * .35); c.bezierCurveTo(x - r * .9, y - r * .25, x - r * .45, y - r * .95, x, y - r * .45); c.bezierCurveTo(x + r * .45, y - r * .95, x + r * .9, y - r * .25, x, y + r * .35); c.fillStyle = `rgba(255,111,163,${(1 - p) * .85})`; c.fill(); } },
+    siren(c, w, h, v) { const u = Math.min(w, h), red = Math.pow(sin(v * TAU) * .5 + .5, 2), blue = Math.pow(sin(v * TAU + Math.PI) * .5 + .5, 2);
+      glow(c, w * .15, h * .1, u * 1.1, '#FF2A2A', .45 * red); glow(c, w * .85, h * .1, u * 1.1, '#2A6BFF', .45 * blue); sweep(c, w, h, fract(v), .1, .08); },
+    music(c, w, h, v, s) { const n = 16, bw = w / n;
+      for (let i = 0; i < n; i++) { const bh = h * (.12 + .3 * (.5 + .5 * sin((v * (2 + i % 3) + s[i]) * TAU))), g = c.createLinearGradient(0, h - bh, 0, h); g.addColorStop(0, 'rgba(255,79,216,.8)'); g.addColorStop(1, 'rgba(124,92,255,.5)'); c.fillStyle = g; c.fillRect(i * bw + bw * .2, h - bh, bw * .6, bh); }
+      FX.searchlights(c, w, h, v); },
     signal(c, w, h, v, s) { const u = Math.min(w, h), a = -1.15 + .12 * sin(v * TAU), bx = w * .12, by = h * 1.05, L = Math.max(w, h) * 1.1, tx = bx + cos(a) * L * .62, ty = by + sin(a) * L * .62;
       c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + cos(a - .09) * L, by + sin(a - .09) * L); c.lineTo(bx + cos(a + .09) * L, by + sin(a + .09) * L); c.closePath();
       const g = c.createRadialGradient(bx, by, 0, bx, by, L * .9); g.addColorStop(0, 'rgba(255,243,196,.35)'); g.addColorStop(1, 'rgba(255,243,196,0)'); c.fillStyle = g; c.fill();
@@ -202,7 +210,7 @@
   };
 
   const map = {}, periods = {};
-  const P = e => ['speed', 'code', 'neon', 'sand'].includes(e) ? 2400 : ['bolt', 'roar', 'flash', 'scan'].includes(e) ? 3600 : ['globe', 'gears', 'rays', 'clouds', 'fog', 'mist', 'hyperspace'].includes(e) ? 9000 : ['ring', 'spotlight', 'candle', 'lamp', 'signal'].includes(e) ? 6000 : 4800;
+  const P = e => e === 'siren' ? 1600 : ['speed', 'code', 'neon', 'sand', 'music'].includes(e) ? 2400 : ['bolt', 'roar', 'flash', 'scan'].includes(e) ? 3600 : ['globe', 'gears', 'rays', 'clouds', 'fog', 'mist', 'hyperspace'].includes(e) ? 9000 : ['ring', 'spotlight', 'candle', 'lamp', 'signal'].includes(e) ? 6000 : 4800;
   Object.keys(FX).forEach(k => { map['fx_' + k] = FX[k]; periods['fx_' + k] = P(k); });
   Object.keys(DEC).forEach(k => { map['dec_' + k] = DEC[k]; periods['dec_' + k] = k === 'd_1980' ? 3000 : 6000; });
   GenreScenes.register(map, periods);
