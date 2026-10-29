@@ -76,8 +76,8 @@ const FRANCHISES = [
   ['f_hp', 'Harry Potter', '#7F5A17', '#120B03', 'magic', [1241], null],
   ['f_hobbit', 'The Hobbit', '#8A3B12', '#1A0A04', 'ember', [121938], null],
   ['f_lotr', 'The Lord of the Rings', '#6B5418', '#100C04', 'ring', [119], null],
-  ['f_marvel', 'Marvel Studios', '#C8102E', '#2A0309', 'comic', [], '420'],
-  ['f_dc', 'DC', '#0476F2', '#02122E', 'bolt', [], '429|9993|128064|184898'],
+  ['f_marvel', 'Marvel Studios', '#C8102E', '#2A0309', 'comic', [], '420', 299534],
+  ['f_dc', 'DC', '#0476F2', '#02122E', 'signal', [], '429|9993|128064|184898', 209112],
   ['f_avatar', 'Avatar', '#0E7C9E', '#031A24', 'biolume', [87096], null],
   ['f_fast', 'Fast & Furious', '#E0661A', '#1C0C02', 'speed', [9485], null],
   ['f_007', '007', '#9A7B3E', '#0B0A08', 'spotlight', [645], null],
@@ -106,7 +106,7 @@ const FRANCHISES = [
   ['f_iceage', 'Ice Age', '#4FA3C7', '#08202C', 'snow', [8354], null],
   ['f_kungfu', 'Kung Fu Panda', '#B8862B', '#1F1404', 'petals', [77816], null],
   ['f_frozen', 'Frozen', '#6EC1E4', '#0B2533', 'snow', [386382], null],
-].map(([key, name, c1, c2, fx, cols, cos]) => ({ key, name, c1, c2, fx, cols, cos }));
+].map(([key, name, c1, c2, fx, cols, cos, art]) => ({ key, name, c1, c2, fx, cols, cos, art }));
 const STUDIOS = [
   ['s_wb', 'Warner Bros.', '174', '#1A4FA3', '#06142E', 'clouds'],
   ['s_universal', 'Universal', '33', '#1C3D7A', '#02060F', 'globe'],
@@ -153,23 +153,42 @@ const ORDER_SORT = ['order', 'Release order', 'primary_release_date.asc', 'first
 const decadeQuery = d => { const today = new Date().toISOString().slice(0, 10), end = `${d.from + 9}-12-31`; return `primary_release_date.gte=${d.from}-01-01&primary_release_date.lte=${end > today ? today : end}&vote_count.gte=150`; };
 const franchiseQuery = f => f.cos ? `with_companies=${f.cos}&vote_count.gte=150&primary_release_date.lte=${new Date().toISOString().slice(0, 10)}` : '';
 /** Franchise backdrop / studio logo path from TMDB, remembered in this browser. */
-let ART_ = null; const artCache = () => ART_ || (ART_ = raw.get('tile_art', {}));
+let ART_ = null; const artCache = () => ART_ || (ART_ = raw.get('tile_art2', {}));
 async function tileArt(key) {
   const ART = artCache(); if (ART[key]) return ART[key];
   let path = null;
   try {
     const f = FRANCHISES.find(x => x.key === key), st = STUDIOS.find(x => x.key === key);
-    if (f) path = f.cols.length ? (await api.collection(f.cols[0])).backdrop_path : ((await api.discover('movie', franchiseQuery(f), 'popularity.desc', 1)).find(x => x.backdrop_path) || {}).backdrop_path;
+    if (f && f.art) path = (await tmdb(`movie/${f.art}`)).backdrop_path;
+    else if (f) path = f.cols.length ? (await api.collection(f.cols[0])).backdrop_path : ((await api.discover('movie', franchiseQuery(f), 'popularity.desc', 1)).find(x => x.backdrop_path) || {}).backdrop_path;
     else if (st) { for (const id of st.cos.split('|')) { path = (await api.company(id)).logo_path; if (path) break; } }
   } catch (e) { path = null; }
-  if (path) { ART[key] = path; raw.set('tile_art', ART); }
+  if (path) { ART[key] = path; raw.set('tile_art2', ART); }
   return path;
 }
 const artObserver = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { artObserver.unobserve(e.target); fillArt(e.target); } }), { rootMargin: '300px' }) : null;
+/** How to show a studio logo: one-colour → white; colourful (WB shield, Marvel box, MGM lion) → real colours; dark → on a light plate. */
+const LOOK = {};
+function logoLook(p) {
+  const saved = raw.get('logo_look', {}); if (saved[p]) return Promise.resolve(saved[p]);
+  return LOOK[p] || (LOOK[p] = new Promise(res => {
+    const im = new Image(); im.crossOrigin = 'anonymous';
+    im.onload = () => { try {
+      const w = 64, h = Math.max(8, Math.min(160, Math.round(im.height * 64 / im.width))), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      const c = cv.getContext('2d'); c.drawImage(im, 0, 0, w, h); const d = c.getImageData(0, 0, w, h).data;
+      let n = 0, sl = 0, sl2 = 0, sc = 0, sc2 = 0;
+      for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 160) continue; const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, l = .2126 * r + .7152 * g + .0722 * b, ch = Math.max(r, g, b) - Math.min(r, g, b); n++; sl += l; sl2 += l * l; sc += ch; sc2 += ch * ch; }
+      const m = sl / n, sdL = Math.sqrt(Math.max(0, sl2 / n - m * m)), sdC = Math.sqrt(Math.max(0, sc2 / n - (sc / n) ** 2));
+      const look = n < 20 || (sdL < .12 && sdC < .12) ? 'white' : m < .38 ? 'plate' : 'color';
+      const all = raw.get('logo_look', {}); all[p] = look; raw.set('logo_look', all); res(look);
+    } catch (e) { res('white'); } };
+    im.onerror = () => res('white'); im.src = IMG + 'w300' + p;
+  }));
+}
 async function fillArt(el) {
   const p = await tileArt(el.dataset.art); if (!p) return;
   if (el.tagName === 'IMG') { el.src = IMG + (el.dataset.size || 'w780') + p; }
-  else { el.style.setProperty('--logo', `url("${IMG}w300${p}")`); el.classList.add('has'); }
+  else { el.style.setProperty('--logo', `url("${IMG}w300${p}")`); el.classList.add('has'); logoLook(p).then(l => el.classList.add('look-' + l)); }
 }
 const franchiseTile = (f, i) => `<a class="tile fr" href="#/catalog/franchise/${f.key}" style="${tileStyle(f.c1, f.c2, i)}"><img class="kb" data-art="${f.key}" alt="" style="animation-delay:-${(i * 1.3) % 16}s" onload="this.classList.add('ok')"><i class="scrim"></i><canvas data-scene="fx_${f.fx}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(f.name))}</b></span></a>`;
 const studioTile = (st, i) => `<a class="tile st" href="#/catalog/studio/${st.key}" style="${tileStyle(st.c1, st.c2, i)}" aria-label="${esc(st.name)}"><canvas data-scene="fx_${st.fx}" data-i="${i}"></canvas><span class="slogo" data-art="${st.key}" style="animation-delay:-${(i * .37) % 4}s"><i></i><b>${esc(st.name)}</b></span></a>`;

@@ -701,5 +701,9 @@ window.LUMIO_AR = {
 "Despicable Me & Minions": "أنا الحقير والتوابع",
 "Ice Age": "العصر الجليدي",
 "Kung Fu Panda": "كونغ فو باندا",
-"Frozen": "ملكة الثلج"
+"Frozen": "ملكة الثلج",
+"from": "من",
+"All episodes": "كل الحلقات",
+"In Library": "في المكتبة",
+"More": "المزيد"
 };

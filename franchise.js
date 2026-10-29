@@ -51,6 +51,13 @@
       c.fillStyle = W(.1); for (let y = step / 2; y < h; y += step) for (let x = step / 2; x < w; x += step) { const r = step * .32 * Math.max(0, Math.min(1, 1 - Math.hypot(x - cx, y - cy) / M * 1.4)); if (r > .6) { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); } }
       sweep(c, w, h, fract(v * 2), .28); },
     bolt,
+    signal(c, w, h, v, s) { const u = Math.min(w, h), a = -1.15 + .12 * sin(v * TAU), bx = w * .12, by = h * 1.05, L = Math.max(w, h) * 1.1, tx = bx + cos(a) * L * .62, ty = by + sin(a) * L * .62;
+      c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + cos(a - .09) * L, by + sin(a - .09) * L); c.lineTo(bx + cos(a + .09) * L, by + sin(a + .09) * L); c.closePath();
+      const g = c.createRadialGradient(bx, by, 0, bx, by, L * .9); g.addColorStop(0, 'rgba(255,243,196,.35)'); g.addColorStop(1, 'rgba(255,243,196,0)'); c.fillStyle = g; c.fill();
+      glow(c, tx, ty, u * .45, '#FFE08A', .45 + .1 * sin(v * TAU * 3)); ringS(c, tx, ty, u * .13, 'rgba(255,240,184,.55)', u * .02);
+      for (let i = 0; i < 4; i++) glow(c, (fract(v + s[i]) * 1.6 - .3) * w, h * (.1 + .2 * s[i + 4]), w * .3, '#9FB4D6', .16);
+      for (let i = 0; i < 20; i++) { const p = fract(v * 3 + s[i]), x = s[(i + 5) % s.length] * w * 1.2 - p * w * .1, y = -h * .1 + p * h * 1.2; line(c, x, y, x - w * .012, y + h * .09, 'rgba(207,227,255,.35)', u * .006); }
+      const f = v >= .42 && v <= .46 ? 1 - (v - .42) / .04 : v >= .5 && v <= .52 ? 1 - (v - .5) / .02 : 0; if (f > 0) { c.fillStyle = `rgba(221,232,255,${.3 * f})`; c.fillRect(0, 0, w, h); } },
     biolume(c, w, h, v, s) { const u = Math.min(w, h);
       for (let i = 0; i < 16; i++) { const p = fract(v + s[i]), x = s[i + 6] * w + sin((v + s[i]) * TAU * 2) * u * .1, y = h * (1.1 - 1.2 * p), tw = .55 + .45 * sin((v * 4 + s[i]) * TAU);
         glow(c, x, y, u * .1, i % 3 ? '#5CF2FF' : '#B57CFF', .35 * tw); circle(c, x, y, u * .012, W(.7 * tw)); } },
@@ -195,7 +202,7 @@
   };
 
   const map = {}, periods = {};
-  const P = e => ['speed', 'code', 'neon', 'sand'].includes(e) ? 2400 : ['bolt', 'roar', 'flash', 'scan'].includes(e) ? 3600 : ['globe', 'gears', 'rays', 'clouds', 'fog', 'mist', 'hyperspace'].includes(e) ? 9000 : ['ring', 'spotlight', 'candle', 'lamp'].includes(e) ? 6000 : 4800;
+  const P = e => ['speed', 'code', 'neon', 'sand'].includes(e) ? 2400 : ['bolt', 'roar', 'flash', 'scan'].includes(e) ? 3600 : ['globe', 'gears', 'rays', 'clouds', 'fog', 'mist', 'hyperspace'].includes(e) ? 9000 : ['ring', 'spotlight', 'candle', 'lamp', 'signal'].includes(e) ? 6000 : 4800;
   Object.keys(FX).forEach(k => { map['fx_' + k] = FX[k]; periods['fx_' + k] = P(k); });
   Object.keys(DEC).forEach(k => { map['dec_' + k] = DEC[k]; periods['dec_' + k] = k === 'd_1980' ? 3000 : 6000; });
   GenreScenes.register(map, periods);
