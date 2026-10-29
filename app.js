@@ -222,6 +222,9 @@ function fillRowArt(root) {
 
 // ============================================================================ icons
 const P = {
+  user: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm0 14c-2.03 0-4.43-.82-6.14-2.88a9.947 9.947 0 0 1 12.28 0C16.43 19.18 14.03 20 12 20z',
+  up: 'M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z', down: 'M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z',
+  tune: 'M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z',
   home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
   livetv: 'M21 6h-7.59l3.29-3.29L16 2l-4 4-4-4-.71.71L10.59 6H3c-1.1 0-2 .89-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.11-.9-2-2-2zm0 14H3V8h18v12zM9 10v8l7-4z',
   star: 'M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
@@ -316,7 +319,8 @@ function fromApp(a) {
     skipNudity: !!a.skipNudity, subLang: a.subtitleLanguage || 'en', subScale: a.subtitleScale ?? 1, subBg: a.subtitleBackground ?? true,
     autoNext: a.autoPlayNext ?? true, lang: a.language || raw.get('lumio.deviceLang', 'en'),
     iptv: Array.isArray(a.iptvSources) ? a.iptvSources : [], favs: Array.isArray(a.favChannels) ? a.favChannels : [], recents: Array.isArray(a.recentChannels) ? a.recentChannels : [],
-    addons: Array.isArray(a.addons) ? a.addons.map(x => ({ url: x.manifestUrl, name: x.name, resources: x.resources || [], builtIn: !!x.builtIn }))
+    addons: Array.isArray(a.addons) ? a.addons.map(x => ({ url: x.manifestUrl, name: x.name, resources: x.resources || [], builtIn: !!x.builtIn,
+        enabled: x.enabled !== false, configurable: !!x.configurable, version: x.version || '', description: x.description || null, logo: x.logo || null }))
       : (a.builtInAddonsVersion ? [] : BUILT_IN_ADDONS.slice()),
   };
 }
@@ -327,7 +331,8 @@ function toApp(w, base) {
     skipIntro: w.skipIntro.toUpperCase(), skipRecap: w.skipRecap.toUpperCase(), skipCredits: w.skipCredits.toUpperCase(), skipNudity: !!w.skipNudity,
     subtitleLanguage: w.subLang, subtitleScale: w.subScale, subtitleBackground: w.subBg, autoPlayNext: w.autoNext, language: w.lang,
     iptvSources: w.iptv || [], favChannels: w.favs || [], recentChannels: w.recents || [],
-    addons: w.addons.map(x => ({ manifestUrl: x.url, name: x.name, resources: x.resources || [], builtIn: !!x.builtIn })),
+    addons: w.addons.map(x => ({ manifestUrl: x.url, name: x.name, resources: x.resources || [], builtIn: !!x.builtIn,
+      enabled: x.enabled !== false, configurable: !!x.configurable, version: x.version || '', description: x.description || null, logo: x.logo || null })),
     builtInAddonsVersion: Math.max(base.builtInAddonsVersion || 0, 1),
   });
 }
@@ -623,13 +628,15 @@ function loadServices() {
 
 // Addons (Stremio protocol)
 const addonBase = a => a.url.replace(/\/manifest\.json$/, '').replace(/\/$/, '');
-const supports = (a, r) => !a.resources || !a.resources.length || a.resources.includes(r);
+const supports = (a, r) => a.enabled !== false && (!a.resources || !a.resources.length || a.resources.includes(r));
 async function fetchManifest(url) {
   let clean = url.trim().replace(/^stremio:\/\//, 'https://');
   if (!clean.endsWith('manifest.json')) clean = clean.replace(/\/$/, '') + '/manifest.json';
   const m = await getJSON(clean);
   const resources = (m.resources || []).map(r => typeof r === 'string' ? r : r && r.name).filter(Boolean);
-  return { url: clean, name: m.name || 'Addon', resources };
+  const hint = k => !!(m.behaviorHints && m.behaviorHints[k]);
+  return { url: clean, name: m.name || 'Addon', resources, enabled: true, configurable: hint('configurable') || hint('configurationRequired'),
+    version: m.version || '', description: m.description || null, logo: m.logo || null };
 }
 const quality = s => { s = s.toUpperCase(); return /2160|4K|UHD/.test(s) ? '4K' : /1080/.test(s) ? '1080p' : /720/.test(s) ? '720p' : ''; };
 const hdr = s => { s = s.toUpperCase(); return /DOLBY VISION|\bDV\b|DOVI/.test(s) ? 'Dolby Vision' : /HDR10\+/.test(s) ? 'HDR10+' : /HDR/.test(s) ? 'HDR' : ''; };
@@ -741,7 +748,7 @@ async function route() {
       case 'tv': await channelsView(args[0], args[1], token); break;
       case 'search': searchView(); break;
       case 'library': libraryView(args[0]); break;
-      case 'settings': settingsView(); break;
+      case 'settings': settingsView(args[0] || ''); break;
       case 'appearance': appearanceView(); break;
       case 'party': partyView(args[0]); break;
       case 'catalog': catalogView(args[0], args[1], token); break;
@@ -1886,74 +1893,132 @@ function profileEditor(orig, isNew) {
 }
 
 // ============================================================================ settings
-function settingsView() {
-  const sw = (id, on) => `<button class="switch ${on ? 'on' : ''}" id="${id}" role="switch" aria-checked="${!!on}"></button>`;
-  const modeChips = (id, val) => `<div class="chips" style="padding:8px 0 0">${['off', 'button', 'auto'].map(m => `<button class="chip sm ${val === m ? 'on' : ''}" data-mode="${id}:${m}">${{ off: 'Off', button: 'Button', auto: 'Auto' }[m]}</button>`).join('')}</div>`;
+/**
+ * Settings, organised like the phone & TV apps: a hub (profile card, then Account / General / About groups — each row a
+ * coloured icon, title, summary and chevron) and one page per topic at #/settings/<page>.
+ */
+let SET_PAGE = null;
+const SET_PAGES = {
+  account: ['Account', 'user', '#3B82F6'], party: ['Watch party', 'group', '#EC4899'], language: ['Language', 'lang', '#0EA5E9'],
+  content: ['Catalog & region', 'movie', '#F59E0B'], addons: ['Stream addons', 'ext', '#8B5CF6'], playback: ['Playback', 'playC', '#22C55E'],
+  install: ['Install on iPhone', 'phone', '#14B8A6'], about: ['About Lumio', 'info', '#64748B'],
+};
+function settingsView(page) {
+  if (page !== undefined) SET_PAGE = page || null;
+  page = SET_PAGE;
   const standalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
-  view.innerHTML = `<h1 class="page-title gutter">${T("Settings")}</h1><div class="gutter">
-    <div class="set-h">${ic('home')}${T('Account')}</div>
-    <div class="card">
+  const chev = `<span class="chev">${S.lang === 'ar' ? '‹' : '›'}</span>`;
+  const row = (href, icon, tint, title, sub) => `<a class="hub-row" href="${href}"><span class="hub-ic" style="--t:${tint}">${ic(icon)}</span><div><b>${esc(T(title))}</b><small>${esc(sub)}</small></div>${chev}</a>`;
+  const go = k => row('#/settings/' + k, SET_PAGES[k][1], SET_PAGES[k][2], SET_PAGES[k][0], settingsSummary(k));
+  if (!page || !SET_PAGES[page]) {
+    const p = activeProfile(), synced = raw.get('lumio.lastSync', 0);
+    view.innerHTML = `<h1 class="page-title gutter">${T("Settings")}</h1><div class="gutter hub-wrap">
+      <a class="card hub-profile" href="#/settings/account">${avatarHTML(p.avatar, p.avatarUrl, 56)}<div><b>${esc(p.name)}</b><small>${esc(SESSION?.email || '')}${synced ? ' · ' + T('Synced') : ''}</small></div>${chev}</a>
+      <div class="hub-l">${T('Account')}</div>
+      <div class="card hub">${go('account')}${go('party')}</div>
+      <div class="hub-l">${T('General')}</div>
+      <div class="card hub">${row('#/appearance', 'palette', '#A855F7', 'Appearance', T('Theme, title colour, Arabic font and app icon'))}${go('language')}${go('content')}${go('addons')}${go('playback')}${standalone ? '' : go('install')}</div>
+      <div class="hub-l">${T('About')}</div>
+      <div class="card hub">${go('about')}</div>
+      <div style="height:30px"></div></div>`;
+    return;
+  }
+  const [title] = SET_PAGES[page];
+  const head = `<a class="icon-btn back" href="#/settings" aria-label="Back">${ic('back')}</a><h1 class="page-title gutter" style="padding-inline-start:64px">${T(title)}</h1><div class="gutter set-page">`;
+  const body = settingsPage(page, standalone);
+  view.innerHTML = head + body + '<div style="height:40px"></div></div>';
+  bindSettings(page);
+}
+function settingsSummary(k) {
+  switch (k) {
+    case 'account': return T('Profile, sync status and sign out');
+    case 'party': return PARTY.code ? `${T('In party')} ${PARTY.code}` : T('Watch together in sync, chat and reactions');
+    case 'language': return S.lang === 'ar' ? 'العربية' : 'English';
+    case 'content': return `TMDB · ${T('region')} ${S.region}`;
+    case 'addons': return `${S.addons.filter(a => a.enabled !== false).length}/${S.addons.length} ${T('on')} · ${T('Configure, order and switch off')}`;
+    case 'playback': return T('Player, subtitles, skipping and auto-play');
+    case 'install': return T('Add Lumio to your Home Screen');
+    default: return T('Version and this browser');
+  }
+}
+const sw = (id, on) => `<button class="switch ${on ? 'on' : ''}" id="${id}" role="switch" aria-checked="${!!on}"></button>`;
+function settingsPage(page, standalone) {
+  const modeChips = (id, val) => `<div class="chips" style="padding:8px 0 0">${['off', 'button', 'auto'].map(m => `<button class="chip sm ${val === m ? 'on' : ''}" data-mode="${id}:${m}">${T({ off: 'Off', button: 'Button', auto: 'Auto' }[m])}</button>`).join('')}</div>`;
+  switch (page) {
+    case 'account': return `<div class="card">
       <div class="set-row">${avatarHTML(activeProfile().avatar, activeProfile().avatarUrl, 48)}<div><b>${esc(activeProfile().name)}</b><small>${T(activeProfile().id === MAIN ? 'Main profile' : activeProfile().shareAddons ? "Uses the main profile's addons" : 'Own addon list')}</small></div><button class="btn tonal" id="pswitch" style="height:36px;padding:0 14px">${T('Switch profile')}</button></div>
-      <div class="set-row"><span class="pin-ic">${ic('home')}</span><div><b>${esc(SESSION?.email || '')}</b><small>${raw.get('lumio.lastSync', 0) ? T('Synced') + ' ' + new Date(raw.get('lumio.lastSync', 0)).toLocaleString() : T('Not synced yet')}</small></div></div>
-      <div class="set-row" style="gap:10px"><button class="btn tonal" id="psync" style="height:36px;padding:0 14px">${T('Sync now')}</button><button class="btn outline" id="signout" style="height:36px;padding:0 14px">${T('Sign out')}</button></div>
-    </div>
-    <div class="set-h">${ic('lang')}${T('Language')}</div>
-    <div class="card"><div class="set-row" style="display:block"><b>${T('App language')}</b><small>${T('Movie and show titles always stay in English')}</small>
-      <div class="chips" style="padding:10px 0 0"><button class="chip ${S.lang !== 'ar' ? 'on' : ''}" data-lang="en">English</button><button class="chip ${S.lang === 'ar' ? 'on' : ''}" data-lang="ar">العربية</button></div></div></div>
-    ${standalone ? '' : `<div class="set-h">${ic('phone')}${T("Install on iPhone")}</div><div class="card"><div class="set-row"><div><b>${T("Add Lumio to your Home Screen")}</b><small>${T("In Safari, tap the Share button, then “Add to Home Screen”. Lumio then opens full-screen like an app.")}</small></div></div></div>`}
-    <div class="set-h">${ic('palette')}${T("Appearance")}</div>
-    <div class="card"><a class="set-row ap-row" href="#/appearance"><span class="ap-ic">${ic('palette')}</span><div><b>${T("Appearance")}</b><small>${T("Theme, title colour, Arabic font and app icon")}</small></div><span class="chev">${S.lang === 'ar' ? '‹' : '›'}</span></a></div>
-
-    <div class="set-h">${ic('group')}${T("Watch party")}</div>
-    <div class="card"><div class="set-row" style="display:block">${PARTY.code ? `<b>🎉 ${T('In party')} ${esc(PARTY.code)} · ${PARTY.members.length} ${T('watching')}</b>`
+      <div class="set-row"><span class="pin-ic">${ic('user')}</span><div><b>${esc(SESSION?.email || '')}</b><small>${raw.get('lumio.lastSync', 0) ? T('Synced') + ' ' + new Date(raw.get('lumio.lastSync', 0)).toLocaleString() : T('Not synced yet')}</small></div></div>
+      <div class="set-row" style="gap:10px"><button class="btn tonal" id="psync" style="height:36px;padding:0 14px">${T('Sync now')}</button><button class="btn outline" id="signout" style="height:36px;padding:0 14px">${T('Sign out')}</button></div></div>`;
+    case 'party': return `<div class="card"><div class="set-row" style="display:block">${PARTY.code ? `<b>🎉 ${T('In party')} ${esc(PARTY.code)} · ${PARTY.members.length} ${T('watching')}</b>`
       : `<small>${T("Start a party from the player while watching (the 👥 button), or join a friend's with their code.")}</small>
-      <form id="sjoin" class="prow" style="padding-top:10px"><input class="field" id="sjc" placeholder="ABC123" maxlength="8" autocapitalize="characters" autocomplete="off"><button class="btn acc">${T('Join')}</button></form>`}</div></div>
-
-    <div class="set-h">${ic('ffwd')}${T("Skipping")}</div>
-    <div class="card">
+      <form id="sjoin" class="prow" style="padding-top:10px"><input class="field" id="sjc" placeholder="ABC123" maxlength="8" autocapitalize="characters" autocomplete="off"><button class="btn acc">${T('Join')}</button></form>`}</div></div>`;
+    case 'language': return `<div class="card"><div class="set-row" style="display:block"><b>${T('App language')}</b><small>${T('Movie and show titles always stay in English')}</small>
+      <div class="chips" style="padding:10px 0 0"><button class="chip ${S.lang !== 'ar' ? 'on' : ''}" data-lang="en">English</button><button class="chip ${S.lang === 'ar' ? 'on' : ''}" data-lang="ar">العربية</button></div></div></div>`;
+    case 'content': return `<div class="card">
+      <div class="set-row" style="display:block"><b>${T("Streaming region")}</b><small>${T("Which country's Netflix, Disney+, Prime Video… catalogs to show")} (US, KW, SA, AE, GB…)</small><input class="field" id="region" style="margin-top:8px" maxlength="2" value="${esc(S.region)}"></div>
+      <div class="set-row" style="display:block"><b>${T("TMDB API key")}</b><small>${T(S.tmdbKey ? 'Using your own key. Clear the field and save to go back to the built-in key.' : 'Built-in key is active. Paste your own key only if you want to override it.')}</small><input class="field" id="tmdbKey" style="margin-top:8px" type="password" autocomplete="off" value="${esc(S.tmdbKey)}"></div></div>`;
+    case 'addons': return `<div class="card"><form class="set-row" style="display:grid;gap:10px" id="addf"><small style="margin:0">${T("Paste a Stremio-compatible addon manifest URL (…/manifest.json). Only install sources you have the right to stream.")}</small>
+      <input class="field" id="addu" type="url" placeholder="https://…/manifest.json" autocomplete="off"><button class="btn acc" type="submit" style="justify-self:start">${T("Install addon")}</button></form></div>
+      <p class="dim" style="font-size:12px;margin:12px 4px">${T("Addons at the top are asked first. Switch one off to keep it without using it.")}</p>
+      ${S.addons.map((a, i) => `<div class="card addon ${a.enabled === false ? 'off' : ''}">
+        <div class="set-row"><span class="ad-logo">${a.logo ? `<img src="${esc(a.logo)}" alt="">` : ic('ext')}</span><div><b>${esc(a.name)}</b><small>${[a.builtIn ? T('Built-in') : '', a.version ? 'v' + esc(a.version) : '', (a.resources || []).map(r => T(r)).join(' · ')].filter(Boolean).join('  •  ')}</small></div>${sw('aon' + i, a.enabled !== false)}</div>
+        ${a.description ? `<p class="ad-desc">${esc(a.description)}</p>` : ''}
+        <div class="ad-acts">${a.builtIn ? '' : `<button class="btn tonal sm" data-cfg="${i}">${ic('tune')}${T('Configure')}</button><button class="icon-btn" data-link="${i}" title="${T('Update link')}">${ic('link')}</button>`}
+          <button class="icon-btn" data-ref="${i}" title="${T('Refresh')}">${ic('sync')}</button><span style="flex:1"></span>
+          <button class="icon-btn" data-mv="${i}:-1" ${i ? '' : 'disabled'} title="${T('Move up')}">${ic('up')}</button><button class="icon-btn" data-mv="${i}:1" ${i < S.addons.length - 1 ? '' : 'disabled'} title="${T('Move down')}">${ic('down')}</button>
+          <button class="icon-btn danger" data-del="${i}" title="${T('Remove')}">${ic('del')}</button></div>
+        <form class="ad-link hidden" data-lf="${i}"><small>${T("After saving your settings on the addon's page, copy its new install link (…/manifest.json) and paste it here.")}</small><div class="prow"><input class="field" value="${esc(a.url)}" autocomplete="off"><button class="btn acc">${T('Save')}</button></div></form>
+      </div>`).join('') || `<div class="card"><div class="set-row"><small>${T("No addons installed")}</small></div></div>`}`;
+    case 'playback': return `<div class="set-h">${ic('ffwd')}${T("Skipping")}</div><div class="card">
       <div class="set-row" style="display:block"><b>${T("Skip intros")}</b><small>${T("Opening titles and theme songs")}</small>${modeChips('skipIntro', S.skipIntro)}</div>
-      <div class="set-row" style="display:block"><b>${T("Skip recaps")}</b><small>“Previously on…” at the start of episodes</small>${modeChips('skipRecap', S.skipRecap)}</div>
-      <div class="set-row" style="display:block"><b>${T("Skip credits")}</b><small>Shows “Next Episode” on series</small>${modeChips('skipCredits', S.skipCredits)}</div>
-      <div class="set-row"><div><b>${T("Auto-skip nudity scenes")}</b><small>${T("Skips scenes in filter files you import, and scenes you mark yourself in the player under Scenes")}</small></div>${sw('skipNudity', S.skipNudity)}</div>
-    </div>
-
-    <div class="set-h">${ic('playC')}${T("Player")}</div>
-    <div class="card">
+      <div class="set-row" style="display:block"><b>${T("Skip recaps")}</b><small>${T("“Previously on…” at the start of episodes")}</small>${modeChips('skipRecap', S.skipRecap)}</div>
+      <div class="set-row" style="display:block"><b>${T("Skip credits")}</b><small>${T("Shows “Next Episode” on series")}</small>${modeChips('skipCredits', S.skipCredits)}</div>
+      <div class="set-row"><div><b>${T("Auto-skip nudity scenes")}</b><small>${T("Skips scenes in filter files you import, and scenes you mark yourself in the player under Scenes")}</small></div>${sw('skipNudity', S.skipNudity)}</div></div>
+      <div class="set-h">${ic('playC')}${T("Player")}</div><div class="card">
       <div class="set-row"><div><b>${T("Auto-play next episode")}</b></div>${sw('autoNext', S.autoNext)}</div>
       <div class="set-row" style="display:block"><b>${T('Subtitle size')}: <span id="ssv">${Math.round(S.subScale * 100)}%</span></b><input type="range" id="subScale" min="0.6" max="2" step="0.1" value="${S.subScale}"></div>
-      <div class="set-row" style="display:block"><b>${T("Preferred subtitle language")}</b><small>${T("ISO code, e.g. en, ar")}</small><input class="field" id="subLang" style="margin-top:8px" maxlength="3" value="${esc(S.subLang)}"></div>
-    </div>
-
-    <div class="set-h">${ic('movie')}${T("Catalog")}</div>
-    <div class="card">
-      <div class="set-row" style="display:block"><b>${T("Streaming region")}</b><small>Which country's Netflix, Disney+, Prime Video… catalogs to show (US, KW, SA, AE, GB…)</small><input class="field" id="region" style="margin-top:8px" maxlength="2" value="${esc(S.region)}"></div>
-      <div class="set-row" style="display:block"><b>${T("TMDB API key")}</b><small>${S.tmdbKey ? 'Using your own key. Clear it to use the built-in key.' : 'Built-in key is active. Paste your own only to override it.'}</small><input class="field" id="tmdbKey" style="margin-top:8px" type="password" autocomplete="off" value="${esc(S.tmdbKey)}"></div>
-    </div>
-
-    <div class="set-h">${ic('ext')}${T("Stream addons")}</div>
-    <div class="card"><form class="set-row" style="display:grid;gap:10px" id="addf"><small style="margin:0">${T("Paste a Stremio-compatible addon manifest URL (…/manifest.json). Only install sources you have the right to stream.")}</small>
-      <input class="field" id="addu" type="url" placeholder="https://…/manifest.json" autocomplete="off"><button class="btn acc" type="submit" style="justify-self:start">${T("Install addon")}</button></form></div>
-    <div class="card" id="addons">${S.addons.map((a, i) => `<div class="set-row"><div><b>${esc(a.name)}</b><small>${a.builtIn ? T('Built-in • ') : ''}${esc((a.resources || []).join(', ') || addonBase(a))}</small></div><button class="icon-btn" data-del="${i}" aria-label="Remove ${esc(a.name)}" style="background:none">${ic('del')}</button></div>`).join('') || `<div class="set-row"><small>${T("No addons installed")}</small></div>`}</div>
-    <p class="dim" style="font-size:12px;padding:24px 0">Lumio web • works best in Safari on iPhone. HDR & Dolby Vision play natively on supported iPhones for HLS/MP4 streams.</p>
-  </div>`;
-  $('#signout').onclick = signOut;
-  $('#pswitch').onclick = () => { PROFILE_CHOSEN = false; profilesView(); };
-  $('#psync').onclick = async () => { toast('Syncing…'); try { await serial(() => cloudPullNow(true)); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); settingsView(); } catch { toast('Network error'); } };
-  view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); settingsView(); renderNav('settings'); });
-  const toggle = (id, key) => $('#' + id).onclick = () => { S[key] = !S[key]; saveSettings(); settingsView(); };
+      <div class="set-row" style="display:block"><b>${T("Preferred subtitle language")}</b><small>${T("ISO code, e.g. en, ar")}</small><input class="field" id="subLang" style="margin-top:8px" maxlength="3" value="${esc(S.subLang)}"></div></div>`;
+    case 'install': return `<div class="card"><div class="set-row"><div><b>${T("Add Lumio to your Home Screen")}</b><small>${T("In Safari, tap the Share button, then “Add to Home Screen”. Lumio then opens full-screen like an app.")}</small></div></div></div>`;
+    default: return `<div class="card"><div class="set-row"><span class="pin-ic">${ic('info')}</span><div><b>Lumio web</b><small>${T('Version')} ${esc((document.querySelector('script[src^="app.js"]')?.getAttribute('src') || '').split('v=')[1] || '')}</small></div></div>
+      <div class="set-row"><div><b>${T('This browser')}</b><small>${esc(navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 120))}</small></div></div>
+      <div class="set-row"><div><small>${T('Works best in Safari on iPhone. HDR & Dolby Vision play natively on supported iPhones for HLS/MP4 streams.')}</small></div></div></div>`;
+  }
+}
+function bindSettings(page) {
+  const re = () => settingsView();
+  const on = (sel, ev, fn) => { const el = $(sel); if (el) el[ev] = fn; };
+  on('#signout', 'onclick', signOut);
+  on('#pswitch', 'onclick', () => { PROFILE_CHOSEN = false; profilesView(); });
+  on('#psync', 'onclick', async () => { toast('Syncing…'); try { await serial(() => cloudPullNow(true)); loadProfileData(); applyTheme(); applyLang(); toast('Synced'); re(); } catch { toast('Network error'); } });
+  view.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { S.lang = b.dataset.lang; saveSettings(); renderNav(null); re(); renderNav('settings'); });
+  const toggle = (id, key) => on('#' + id, 'onclick', () => { S[key] = !S[key]; saveSettings(); re(); });
   toggle('skipNudity', 'skipNudity'); toggle('autoNext', 'autoNext');
   $('#sjoin')?.addEventListener('submit', e => { e.preventDefault(); location.hash = '#/party/' + $('#sjc').value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
-  view.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { const [k, m] = b.dataset.mode.split(':'); S[k] = m; saveSettings(); settingsView(); });
-  $('#subScale').oninput = e => { S.subScale = +e.target.value; $('#ssv').textContent = Math.round(S.subScale * 100) + '%'; saveSettings(); };
-  $('#subLang').onchange = e => { S.subLang = e.target.value.trim().toLowerCase(); saveSettings(); };
-  $('#region').onchange = e => { const v = e.target.value.trim().toUpperCase(); if (/^[A-Z]{2}$/.test(v)) { S.region = v; saveSettings(); servicesReady = null; cache.clear(); toast('Region set to ' + v); } else toast('Use a 2-letter country code'); };
-  $('#tmdbKey').onchange = e => { S.tmdbKey = e.target.value.trim(); saveSettings(); cache.clear(); servicesReady = null; toast('Saved'); };
-  $('#addf').onsubmit = async e => {
+  view.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { const [k, m] = b.dataset.mode.split(':'); S[k] = m; saveSettings(); re(); });
+  on('#subScale', 'oninput', e => { S.subScale = +e.target.value; $('#ssv').textContent = Math.round(S.subScale * 100) + '%'; saveSettings(); });
+  on('#subLang', 'onchange', e => { S.subLang = e.target.value.trim().toLowerCase(); saveSettings(); });
+  on('#region', 'onchange', e => { const v = e.target.value.trim().toUpperCase(); if (/^[A-Z]{2}$/.test(v)) { S.region = v; saveSettings(); servicesReady = null; cache.clear(); toast('Region set to ' + v); } else toast('Use a 2-letter country code'); });
+  on('#tmdbKey', 'onchange', e => { S.tmdbKey = e.target.value.trim(); saveSettings(); cache.clear(); servicesReady = null; toast('Saved'); });
+  if (page !== 'addons') return;
+  const keep = (old, fresh) => Object.assign(fresh, { enabled: old.enabled !== false, builtIn: !!old.builtIn });
+  on('#addf', 'onsubmit', async e => {
     e.preventDefault(); const u = $('#addu').value.trim(); if (!u) return;
-    try { const a = await fetchManifest(u); S.addons = S.addons.filter(x => x.url !== a.url).concat(a); saveSettings(); toast('Installed ' + a.name); settingsView(); }
+    try { const a = await fetchManifest(u); S.addons = S.addons.filter(x => x.url !== a.url).concat(a); saveSettings(); toast('Installed ' + a.name); re(); }
     catch (err) { toast("Couldn't load that manifest"); }
-  };
-  view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const a = S.addons[+b.dataset.del]; S.addons.splice(+b.dataset.del, 1); saveSettings(); toast('Removed ' + a.name); settingsView(); });
+  });
+  S.addons.forEach((a, i) => on('#aon' + i, 'onclick', () => { a.enabled = a.enabled === false; saveSettings(); re(); }));
+  view.querySelectorAll('[data-cfg]').forEach(b => b.onclick = () => window.open(addonBase(S.addons[+b.dataset.cfg]) + '/configure', '_blank', 'noopener'));
+  view.querySelectorAll('[data-link]').forEach(b => b.onclick = () => view.querySelector(`[data-lf="${b.dataset.link}"]`).classList.toggle('hidden'));
+  view.querySelectorAll('[data-lf]').forEach(f => f.onsubmit = async e => {
+    e.preventDefault(); const i = +f.dataset.lf, u = f.querySelector('input').value.trim();
+    try { const a = keep(S.addons[i], await fetchManifest(u)); S.addons[i] = a; S.addons = S.addons.filter((x, j) => j === i || x.url !== a.url); saveSettings(); toast('Addon updated'); re(); }
+    catch { toast("Couldn't load manifest"); }
+  });
+  view.querySelectorAll('[data-ref]').forEach(b => b.onclick = async () => {
+    const i = +b.dataset.ref; try { S.addons[i] = keep(S.addons[i], await fetchManifest(S.addons[i].url)); saveSettings(); toast('Addon updated'); re(); } catch { toast("Couldn't load manifest"); }
+  });
+  view.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { const [i, d] = b.dataset.mv.split(':').map(Number), j = i + d; if (j < 0 || j >= S.addons.length) return; const [x] = S.addons.splice(i, 1); S.addons.splice(j, 0, x); saveSettings(); re(); });
+  view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { const a = S.addons[+b.dataset.del]; S.addons.splice(+b.dataset.del, 1); saveSettings(); toast('Removed ' + a.name); re(); });
 }
 
 /** Settings → Appearance: theme colour, AMOLED, title colour, Arabic font, app icon colour (synced with the apps). */
