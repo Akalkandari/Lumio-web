@@ -8,7 +8,7 @@
   const io = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? visible.add(e.target) : visible.delete(e.target))) : null;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  function seeds(key) { let h = 0; for (const c of key) h = (h * 31 + c.charCodeAt(0)) | 0; return Array.from({ length: 12 }, (_, i) => (((h * 31 + i * 7919) & 0xffff) / 65535)); }
+  function seeds(key) { let h = 0; for (const c of key) h = (h * 31 + c.charCodeAt(0)) | 0; return Array.from({ length: 28 }, (_, i) => (((h * 31 + i * 7919) & 0xffff) / 65535)); }
   const sin = Math.sin, cos = Math.cos, abs = Math.abs;
   const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
@@ -295,6 +295,8 @@
 
   window.GenreScenes = {
     has: key => key in S,
+    /** Extra scene packs (franchise.js) plug in here. */
+    register(map, periods) { Object.assign(S, map); Object.assign(PERIOD, periods || {}); },
     attach(canvas, key, index = 0) {
       if (!(key in S)) return;
       items.add({ canvas, key, ctx: canvas.getContext('2d'), period: PERIOD[key] || 3200, offset: index * 170, seeds: seeds(key) });

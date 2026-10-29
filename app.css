@@ -667,3 +667,37 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .sheet.party .btn { width: 100%; justify-content: center; }
 .sheet.party .prow .btn { width: auto; }
 .sheet.party .pmem button, .sheet.party .preq button { width: auto; }
+
+/* ---------------- Home → Franchises / Production Studios / Decades */
+.tile.fr { width: 200px; height: 112px; }
+.tile.st { width: 164px; height: 90px; }
+.tile.dec { width: 132px; height: 80px; }
+@media (min-width: 700px) { .tile.fr { width: 236px; height: 132px; } .tile.st { width: 196px; height: 108px; } .tile.dec { width: 156px; height: 94px; } }
+img.kb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; animation: kenburns 16s ease-in-out infinite alternate; will-change: transform; }
+img.kb.ok { opacity: 1; }
+@keyframes kenburns { 0% { transform: scale(1.12) translate(3%, 0); } 50% { transform: scale(1.17) translate(-3%, 2%); } 100% { transform: scale(1.1) translate(1%, -2%); } }
+.tile .scrim, .banner .scrim { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.05), rgba(0,0,0,.75)); }
+.banner .scrim { background: linear-gradient(to bottom, rgba(0,0,0,.15), color-mix(in srgb, var(--bg) 92%, transparent)); }
+.tile.fr .lbl b { font-size: 15px; text-shadow: 0 2px 8px rgba(0,0,0,.8); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.slogo { position: absolute; inset: 22% 14%; z-index: 1; display: grid; place-items: center; animation: logobob 4.2s ease-in-out infinite; }
+.slogo i { display: none; width: 100%; height: 100%; background: linear-gradient(110deg, #fff 38%, #FFF3C4 50%, #fff 62%); background-size: 300% 100%; animation: logosheen 4.2s linear infinite;
+  -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
+.slogo.has i { display: block; } .slogo.has b { display: none; }
+.slogo b { font-size: 15px; font-weight: 800; text-align: center; text-shadow: 0 2px 6px rgba(0,0,0,.6); }
+.banner .slogo.bn { inset: auto 22px auto auto; top: 26px; width: 150px; height: 64px; z-index: 2; }
+@keyframes logosheen { from { background-position: 150% 0; } to { background-position: -150% 0; } }
+@keyframes logobob { 0%, 100% { transform: translateY(-2%); } 50% { transform: translateY(2%); } }
+.dlbl { position: absolute; left: 10px; bottom: 4px; z-index: 1; line-height: 1; }
+.banner .dlbl { position: static; }
+.dlbl b { display: block; font-size: 30px; white-space: nowrap; }
+.dlbl.big b { font-size: 46px; }
+.dlbl small { display: block; font-size: 11px; font-weight: 700; opacity: .85; margin-top: 2px; } .dlbl.big small { font-size: 15px; }
+.dlbl.d_1960 b { font-family: cursive; font-weight: 700; color: #FFF3B0; text-shadow: 3px 3px 0 #FF2E93; }
+.dlbl.d_1970 b { font-family: Georgia, serif; font-weight: 900; font-style: italic; background: linear-gradient(#FFE08A, #F4A261, #E76F51); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(3px 3px 0 #3A1606); }
+.dlbl.d_1980 b { font-weight: 900; font-style: italic; background: linear-gradient(#7DF9FF, #fff, #FF4FD8); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 8px #FF2E93); }
+.dlbl.d_1990 b { font-family: ui-monospace, monospace; font-weight: 700; color: #fff; text-shadow: 4px 0 0 #EE4266; }
+.dlbl.d_2000 b { font-weight: 800; background: linear-gradient(#fff, #B8C4D6, #fff, #8A9BB5); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 4px #0A2346); }
+.dlbl.d_2010 b { font-weight: 300; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.dlbl.d_2020 b { font-weight: 700; background: linear-gradient(90deg, #7DF9FF, #C084FC, #F9A8D4); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 2px 5px #07263A); }
+[dir=rtl] .dlbl { left: auto; right: 10px; }
+@media (prefers-reduced-motion: reduce) { img.kb, .slogo, .slogo i { animation: none; } }

@@ -71,6 +71,77 @@ const GENRES = [
   ['reality', 'Reality', null, 'with_genres=10764', '#FB8500', '#4A2700'],
   ['kids', 'Kids', null, 'with_genres=10762', '#8ECAE6', '#1B3A4A'],
 ].map(([key, name, mq, tq, c1, c2]) => ({ key, name, mq, tq, c1, c2 }));
+// Home → Franchises / Production Studios / Decades (same ids as the apps, checked against TMDB on every build)
+const FRANCHISES = [
+  ['f_hp', 'Harry Potter', '#7F5A17', '#120B03', 'magic', [1241], null],
+  ['f_hobbit', 'The Hobbit', '#8A3B12', '#1A0A04', 'ember', [121938], null],
+  ['f_lotr', 'The Lord of the Rings', '#6B5418', '#100C04', 'ring', [119], null],
+  ['f_marvel', 'Marvel Studios', '#C8102E', '#2A0309', 'comic', [], '420'],
+  ['f_dc', 'DC', '#0476F2', '#02122E', 'bolt', [], '429|9993|128064|184898'],
+  ['f_avatar', 'Avatar', '#0E7C9E', '#031A24', 'biolume', [87096], null],
+  ['f_fast', 'Fast & Furious', '#E0661A', '#1C0C02', 'speed', [9485], null],
+  ['f_007', '007', '#9A7B3E', '#0B0A08', 'spotlight', [645], null],
+  ['f_starwars', 'Star Wars', '#2B2F3A', '#000000', 'hyperspace', [10], null],
+  ['f_jurassic', 'Jurassic Park', '#4E7A1F', '#0E1A05', 'ripple', [328], null],
+  ['f_mi', 'Mission: Impossible', '#B3261E', '#140404', 'fuse', [87359], null],
+  ['f_pirates', 'Pirates of the Caribbean', '#1F5E73', '#04121A', 'waves', [295], null],
+  ['f_transformers', 'Transformers', '#5B6B7A', '#0A0E14', 'sheen', [8650], null],
+  ['f_matrix', 'The Matrix', '#0F7A2E', '#010A03', 'code', [2344], null],
+  ['f_wick', 'John Wick', '#3A1C5C', '#07020D', 'neon', [404609], null],
+  ['f_indy', 'Indiana Jones', '#A0662A', '#1C0F04', 'dust', [84], null],
+  ['f_bttf', 'Back to the Future', '#2F6FD6', '#0A1024', 'firetrail', [264], null],
+  ['f_terminator', 'Terminator', '#8C1C13', '#0A0303', 'scan', [528], null],
+  ['f_alien', 'Alien', '#2F4A3A', '#030705', 'fog', [8091], null],
+  ['f_rocky', 'Rocky & Creed', '#B0302A', '#120404', 'flash', [1575, 553717], null],
+  ['f_godfather', 'The Godfather', '#4A3424', '#050302', 'candle', [230], null],
+  ['f_madmax', 'Mad Max', '#C2681D', '#1F0E02', 'sand', [8945], null],
+  ['f_monsterverse', 'MonsterVerse', '#1E4B5E', '#02090D', 'roar', [535313], null],
+  ['f_apes', 'Planet of the Apes', '#5E5A2A', '#0D0C04', 'dust', [173710], null],
+  ['f_hunger', 'The Hunger Games', '#B5491B', '#140602', 'ember', [131635], null],
+  ['f_twilight', 'Twilight', '#3D4B5C', '#05070A', 'mist', [33514], null],
+  ['f_conjuring', 'The Conjuring Universe', '#3B2A2A', '#050303', 'fog', [313086], null],
+  ['f_toystory', 'Toy Story', '#2E86DE', '#0A2140', 'bubbles', [10194], null],
+  ['f_shrek', 'Shrek', '#6A9A1F', '#142005', 'bubbles', [2150], null],
+  ['f_despicable', 'Despicable Me & Minions', '#E8B50E', '#2A2002', 'bubbles', [86066, 544669], null],
+  ['f_iceage', 'Ice Age', '#4FA3C7', '#08202C', 'snow', [8354], null],
+  ['f_kungfu', 'Kung Fu Panda', '#B8862B', '#1F1404', 'petals', [77816], null],
+  ['f_frozen', 'Frozen', '#6EC1E4', '#0B2533', 'snow', [386382], null],
+].map(([key, name, c1, c2, fx, cols, cos]) => ({ key, name, c1, c2, fx, cols, cos }));
+const STUDIOS = [
+  ['s_wb', 'Warner Bros.', '174', '#1A4FA3', '#06142E', 'clouds'],
+  ['s_universal', 'Universal', '33', '#1C3D7A', '#02060F', 'globe'],
+  ['s_columbia', 'Columbia Pictures', '5', '#6E8BB5', '#0D1626', 'torch'],
+  ['s_20th', '20th Century Studios', '25|127928', '#3A2E14', '#050402', 'searchlights'],
+  ['s_sony', 'Sony Pictures', '34|2251', '#2C2C30', '#000000', 'sheen'],
+  ['s_paramount', 'Paramount', '4', '#0B4DA2', '#020B1C', 'stars'],
+  ['s_disney', 'Walt Disney Pictures', '2', '#103E8C', '#030A1C', 'arc'],
+  ['s_pixar', 'Pixar', '3', '#3F6E9A', '#0A1420', 'lamp'],
+  ['s_dreamworks', 'DreamWorks Animation', '521', '#2B5DA8', '#050E22', 'moon'],
+  ['s_marvel', 'Marvel Studios', '420', '#C8102E', '#2A0309', 'comic'],
+  ['s_lucasfilm', 'Lucasfilm', '1', '#2B2F3A', '#000000', 'hyperspace'],
+  ['s_lionsgate', 'Lionsgate', '1632|35', '#5C4A2E', '#0E0A05', 'gears'],
+  ['s_mgm', 'Metro-Goldwyn-Mayer', '21', '#8C6A1E', '#140E02', 'rays'],
+  ['s_newline', 'New Line Cinema', '12', '#3E3E46', '#060608', 'filmstrip'],
+  ['s_legendary', 'Legendary', '923', '#2E3A44', '#040608', 'fog'],
+  ['s_illumination', 'Illumination', '6704', '#E8B50E', '#2A2002', 'bubbles'],
+  ['s_a24', 'A24', '41077', '#3A3A3A', '#050505', 'grain'],
+  ['s_blumhouse', 'Blumhouse', '3172', '#4A1212', '#070202', 'fog'],
+  ['s_amblin', 'Amblin Entertainment', '56', '#22305E', '#03050E', 'moon'],
+  ['s_ghibli', 'Studio Ghibli', '10342', '#3B7A57', '#07160E', 'petals'],
+  ['s_toho', 'Toho', '882', '#7A1F1F', '#120303', 'roar'],
+  ['s_miramax', 'Miramax', '14', '#4A3A5E', '#09060D', 'rays'],
+  ['s_focus', 'Focus Features', '10146', '#2E3D4F', '#05080B', 'sheen'],
+  ['s_searchlight', 'Searchlight Pictures', '43|127929', '#3C3220', '#060503', 'searchlights'],
+].map(([key, name, cos, c1, c2, fx]) => ({ key, name, cos, c1, c2, fx }));
+const DECADES = [
+  ['d_1960', '60s', 1960, '#E76F51', '#5C1A3A'],
+  ['d_1970', '70s', 1970, '#D98E04', '#4A2004'],
+  ['d_1980', '80s', 1980, '#FF2E93', '#1A0638'],
+  ['d_1990', '90s', 1990, '#14B8A6', '#2A0F4A'],
+  ['d_2000', '2000s', 2000, '#3BA7F5', '#0A2346'],
+  ['d_2010', '2010s', 2010, '#8B5CF6', '#1A0B3A'],
+  ['d_2020', '2020s', 2020, '#22D3EE', '#07263A'],
+].map(([key, label, from, c1, c2]) => ({ key, label, from, c1, c2 }));
 const DISCOVER = [
   { key: 'foryou', name: 'For You', sub: 'Picked from what you watch', emoji: '✨', c1: '#7C5CFF', c2: '#241466' },
   { key: 'trending', name: 'Trending', sub: 'Hot this week', emoji: '🔥', c1: '#FF6B35', c2: '#5C1A00' },
@@ -78,6 +149,32 @@ const DISCOVER = [
   { key: 'top_rated', name: 'Top Rated', sub: 'All-time best', emoji: '🏆', c1: '#2EC4B6', c2: '#0A403B' },
 ];
 const SORTS = [['popular', 'Popular', 'popularity.desc', 'popularity.desc'], ['top', 'Top Rated', 'vote_average.desc', 'vote_average.desc'], ['new', 'Newest', 'primary_release_date.desc', 'first_air_date.desc']];
+const ORDER_SORT = ['order', 'Release order', 'primary_release_date.asc', 'first_air_date.asc'];
+const decadeQuery = d => { const today = new Date().toISOString().slice(0, 10), end = `${d.from + 9}-12-31`; return `primary_release_date.gte=${d.from}-01-01&primary_release_date.lte=${end > today ? today : end}&vote_count.gte=150`; };
+const franchiseQuery = f => f.cos ? `with_companies=${f.cos}&vote_count.gte=150` : '';
+/** Franchise backdrop / studio logo path from TMDB, remembered in this browser. */
+let ART_ = null; const artCache = () => ART_ || (ART_ = raw.get('tile_art', {}));
+async function tileArt(key) {
+  const ART = artCache(); if (ART[key]) return ART[key];
+  let path = null;
+  try {
+    const f = FRANCHISES.find(x => x.key === key), st = STUDIOS.find(x => x.key === key);
+    if (f) path = f.cols.length ? (await api.collection(f.cols[0])).backdrop_path : ((await api.discover('movie', franchiseQuery(f), 'popularity.desc', 1)).find(x => x.backdrop_path) || {}).backdrop_path;
+    else if (st) { for (const id of st.cos.split('|')) { path = (await api.company(id)).logo_path; if (path) break; } }
+  } catch (e) { path = null; }
+  if (path) { ART[key] = path; raw.set('tile_art', ART); }
+  return path;
+}
+const artObserver = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { artObserver.unobserve(e.target); fillArt(e.target); } }), { rootMargin: '300px' }) : null;
+async function fillArt(el) {
+  const p = await tileArt(el.dataset.art); if (!p) return;
+  if (el.tagName === 'IMG') { el.src = IMG + (el.dataset.size || 'w780') + p; }
+  else { el.style.setProperty('--logo', `url("${IMG}w300${p}")`); el.classList.add('has'); }
+}
+const franchiseTile = (f, i) => `<a class="tile fr" href="#/catalog/franchise/${f.key}" style="${tileStyle(f.c1, f.c2, i)}"><img class="kb" data-art="${f.key}" alt="" style="animation-delay:-${(i * 1.3) % 16}s" onload="this.classList.add('ok')"><i class="scrim"></i><canvas data-scene="fx_${f.fx}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(f.name))}</b></span></a>`;
+const studioTile = (st, i) => `<a class="tile st" href="#/catalog/studio/${st.key}" style="${tileStyle(st.c1, st.c2, i)}" aria-label="${esc(st.name)}"><canvas data-scene="fx_${st.fx}" data-i="${i}"></canvas><span class="slogo" data-art="${st.key}" style="animation-delay:-${(i * .37) % 4}s"><i></i><b>${esc(st.name)}</b></span></a>`;
+const decadeLabel = (d, big) => `<span class="dlbl ${d.key}${big ? ' big' : ''}"><b>${d.label}</b>${S.lang === 'ar' ? `<small>${esc(T(d.label))}</small>` : ''}</span>`;
+const decadeTile = (d, i) => `<a class="tile dec" href="#/catalog/decade/${d.key}" style="${tileStyle(d.c1, d.c2, i)}"><canvas data-scene="dec_${d.key}" data-i="${i}"></canvas>${decadeLabel(d)}</a>`;
 
 // ============================================================================ icons
 const P = {
@@ -437,11 +534,18 @@ const api = {
   details: (type, id) => tmdb(`${type}/${id}?append_to_response=external_ids,credits`),
   person: id => tmdb(`person/${id}?append_to_response=combined_credits`),
   season: (id, n) => tmdb(`tv/${id}/season/${n}`).then(r => r.episodes || []),
+  collection: id => tmdb(`collection/${id}`),
+  company: id => tmdb(`company/${id}`),
+  /** Every film of these TMDB collections (a saga), de-duplicated. */
+  async parts(ids) {
+    const all = (await Promise.all(ids.map(id => api.collection(id).then(r => r.parts || []).catch(() => [])))).flat();
+    const seen = new Set(); return all.filter(x => x.release_date && !seen.has(x.id) && seen.add(x.id)).map(x => Object.assign(x, { media_type: 'movie' }));
+  },
   recs: (type, id) => tmdb(`${type}/${id}/recommendations`).then(r => typed(r.results, type)).catch(() => []),
   discover(type, query, sort, page) {
     const region = S.region || 'US';
-    let extra = sort.startsWith('vote_average') ? '&vote_count.gte=300' : '';
-    if (sort.startsWith('primary_release_date') || sort.startsWith('first_air_date')) extra += `&${type === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${new Date().toISOString().slice(0, 10)}`;
+    let extra = sort.startsWith('vote_average') && !query.includes('vote_count.gte') ? '&vote_count.gte=300' : '';
+    if ((sort.startsWith('primary_release_date') || sort.startsWith('first_air_date')) && !query.includes('_date.lte')) extra += `&${type === 'movie' ? 'primary_release_date' : 'first_air_date'}.lte=${new Date().toISOString().slice(0, 10)}`;
     return tmdb(`discover/${type}?sort_by=${sort}&page=${page}${query.includes('watch_region=') ? '' : '&watch_region=' + region}&include_adult=false${extra}&${query}`).then(r => typed(r.results, type));
   },
 };
@@ -546,11 +650,18 @@ function discoverSections() {
   ${sectionH('Arabic & Turkish', 'Series and films from the region and beyond')}
   <div class="rail gutter">${WORLD.map((w, i) => `<a class="tile genre tv world" href="#/catalog/world/${w.key}" style="${tileStyle(w.c1, w.c2, i)}"><canvas data-scene="tv_${w.scene}" data-i="${i}"></canvas><span class="lbl"><b>${w.emoji} ${esc(T(w.name))}</b></span></a>`).join('')}</div>
   ${sectionH('Genres', 'Something for every mood')}
-  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>`;
+  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}"><canvas data-scene="${g.key}" data-i="${i}"></canvas><span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>
+  ${sectionH('Franchises', 'Every saga, film by film')}
+  <div class="rail gutter">${FRANCHISES.map(franchiseTile).join('')}</div>
+  ${sectionH('Production Studios', 'The studios behind the movies')}
+  <div class="rail gutter">${STUDIOS.map(studioTile).join('')}</div>
+  ${sectionH('Decades', 'Movies from every era')}
+  <div class="rail gutter">${DECADES.map(decadeTile).join('')}</div>`;
 }
 const servicesHTML = list => list.map((s, i) => `<a class="tile service" href="#/catalog/service/${s.key}" style="${tileStyle(s.c1, s.c2, i)}">${logoHTML(s, i)}<b>${esc(s.name)}</b></a>`).join('');
 function mountDiscover(root) {
   root.querySelectorAll('canvas[data-scene]').forEach(c => window.GenreScenes && GenreScenes.attach(c, c.dataset.scene, +c.dataset.i));
+  root.querySelectorAll('[data-art]').forEach(el => artObserver ? artObserver.observe(el) : fillArt(el));
   loadServices().then(list => { const r = $('#services-rail', root); if (r) r.innerHTML = servicesHTML(list); });
 }
 
@@ -679,6 +790,9 @@ function catalogInfo(kind, key) {
   if (kind === 'discover') { const d = DISCOVER.find(x => x.key === key); return d && { title: d.name, sub: d.sub, emoji: d.emoji, c1: d.c1, c2: d.c2, mq: '', tq: key === 'foryou' ? null : '', sortable: false }; }
   if (kind === 'service') { const s = SERVICES.find(x => x.key === key); return s && { title: s.name, sub: `Streaming now on ${s.name}`, service: s, c1: s.c1, c2: s.c2, sortable: true }; }
   if (kind === 'world') { const w = WORLD.find(x => x.key === key); return w && { title: w.name, sub: w.tq ? 'Series everyone is watching' : 'The best films', scene: 'tv_' + w.scene, c1: w.c1, c2: w.c2, mq: w.mq, tq: w.tq, sortable: true }; }
+  if (kind === 'franchise') { const f = FRANCHISES.find(x => x.key === key); return f && { title: f.name, sub: 'Every film, in release order', franchise: f, scene: 'fx_' + f.fx, c1: f.c1, c2: f.c2, mq: franchiseQuery(f), tq: null, sortable: true, sorts: [ORDER_SORT, ...SORTS] }; }
+  if (kind === 'studio') { const st = STUDIOS.find(x => x.key === key); return st && { title: st.name, studio: st, scene: 'fx_' + st.fx, c1: st.c1, c2: st.c2, mq: `with_companies=${st.cos}&vote_count.gte=50`, tq: null, sortable: true }; }
+  if (kind === 'decade') { const d = DECADES.find(x => x.key === key); return d && { title: d.label, decade: d, scene: 'dec_' + d.key, c1: d.c1, c2: d.c2, mq: decadeQuery(d), tq: null, sortable: true }; }
   const g = GENRES.find(x => x.key === key); return g && { title: g.name, sub: `The best ${g.name.toLowerCase()} titles`, genre: g.key, c1: g.c1, c2: g.c2, mq: g.mq, tq: g.tq, sortable: true };
 }
 /** Actor / director page: photo, bio and every movie & series they're in. */
@@ -901,17 +1015,21 @@ async function catalogView(kind, key, token) {
     Object.assign(info, { service: s, mq: q, tq: q });
   }
   if (token !== routeToken) return;
-  const st = { type: info.mq == null ? 'tv' : 'movie', sort: 'popular', page: 0, items: [], loading: false, end: false };
+  const sorts = info.sorts || SORTS;
+  const st = { type: info.mq == null ? 'tv' : 'movie', sort: sorts[0][0], page: 0, items: [], loading: false, end: false };
+  const titleHTML = info.decade ? decadeLabel(info.decade, true) : `<h1>${esc(info.service || info.studio ? info.title : T(info.title))}</h1>`;
+  const subText = info.studio ? `${T('Films from')} ${info.title}` : info.decade ? (S.lang === 'ar' ? `${T('The best films of the')} ${T(info.title)}` : `The best films of the ${info.title}`) : null;
   view.innerHTML = `<a class="icon-btn back" href="javascript:history.back()" aria-label="Back">${ic('back')}</a>
-    <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.genre || info.scene ? `<canvas id="bn-scene"></canvas>` : ''}
+    <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.franchise ? `<img class="kb" id="bn-art" data-art="${info.franchise.key}" data-size="w1280" alt="" onload="this.classList.add('ok')"><i class="scrim"></i>` : ''}${info.genre || info.scene ? `<canvas id="bn-scene"></canvas>` : ''}${info.studio ? `<span class="slogo bn" data-art="${info.studio.key}"><i></i></span>` : ''}
       <div class="ttl">${info.service ? logoHTML(info.service, 0, 58) : (!info.genre && info.emoji ? `<span style="font-size:44px" class="emoji-b">${info.emoji}</span>` : '')}
-        <div><h1>${esc(info.service ? info.title : T(info.title))}</h1><p>${esc(info.service ? `${T('Streaming now on')} ${info.title}` : info.genre ? (S.lang === 'ar' ? `أفضل عناوين ${T(info.title)}` : info.sub) : T(info.sub))}</p></div></div></div>
+        <div>${titleHTML}<p>${esc(subText || (info.service ? `${T('Streaming now on')} ${info.title}` : info.genre ? (S.lang === 'ar' ? `أفضل عناوين ${T(info.title)}` : info.sub) : T(info.sub)))}</p></div></div></div>
     <div class="gutter">
       ${info.mq != null && info.tq != null ? `<div class="chips" id="types"><button class="chip on" data-t="movie">${T("Movies")}</button><button class="chip" data-t="tv">${T("Shows")}</button></div>` : ''}
-      ${info.sortable ? `<div class="chips" id="sorts" style="padding-top:2px">${SORTS.map(([k, l], i) => `<button class="chip sm ${i ? '' : 'on'}" data-s="${k}">${T(l)}</button>`).join('')}</div>` : ''}
+      ${info.sortable ? `<div class="chips" id="sorts" style="padding-top:2px">${sorts.map(([k, l], i) => `<button class="chip sm ${i ? '' : 'on'}" data-s="${k}">${T(l)}</button>`).join('')}</div>` : ''}
       <div class="grid" id="cgrid" style="padding-top:12px"></div><div id="cmore" style="height:1px"></div>
     </div>`;
   if (info.genre || info.scene) GenreScenes.attach($('#bn-scene'), info.genre || info.scene, 0);
+  view.querySelectorAll('.banner [data-art]').forEach(fillArt);
   const grid = $('#cgrid');
   const load = async () => {
     if (st.loading || st.end) return; st.loading = true;
@@ -919,8 +1037,15 @@ async function catalogView(kind, key, token) {
     if (!st.items.length) grid.innerHTML = Array.from({ length: 12 }, () => '<div class="sk" style="aspect-ratio:2/3"></div>').join('');
     let res = [];
     try {
-      const sort = SORTS.find(s => s[0] === mySort);
-      if (kind === 'discover') {
+      const sort = sorts.find(s => s[0] === mySort);
+      if (info.franchise && info.franchise.cols.length) {
+        if (page === 1) {
+          const all = await api.parts(info.franchise.cols), by = {
+            order: (a, b) => a.release_date.localeCompare(b.release_date), new: (a, b) => b.release_date.localeCompare(a.release_date),
+            top: (a, b) => (b.vote_average || 0) - (a.vote_average || 0), popular: (a, b) => (b.popularity || 0) - (a.popularity || 0) };
+          res = all.sort(by[mySort] || by.order);
+        }
+      } else if (kind === 'discover') {
         if (key === 'foryou') res = await forYou();
         else if (key === 'trending') res = await api.trending(myType, 'week', page);
         else res = await api.list(myType, key, page);
