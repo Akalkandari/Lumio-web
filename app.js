@@ -1999,7 +1999,7 @@ function installPage() {
     <button class="btn acc big" id="instcopy">${ic('link')}${T('Copy link')}</button></div>`;
   if (isIOS()) return `<div class="card inst">${icon}<h2>${T('Install Lumio on your iPhone')}</h2>
       <p class="dim">${T('Lumio opens full-screen from your Home Screen like a real app — with the icon you picked in Appearance.')}</p>
-      <a class="btn acc big" id="instgo" href="install/lumio-${esc(S.iconColor || 'classic')}.mobileconfig">${ic('phone')}${T('Install Lumio')}</a></div>
+      <a class="btn acc big" id="instgo" href="${SB_URL}/functions/v1/install-profile?icon=${encodeURIComponent(S.iconColor || 'classic')}">${ic('phone')}${T('Install Lumio')}</a></div>
     <div class="card inst-how" id="insthow">${steps([
       ['1', 'Tap “Allow”', 'Safari asks to download a configuration profile.'],
       ['2', 'Open the Settings app', 'Tap “Profile Downloaded” at the top (or General → VPN & Device Management).'],
