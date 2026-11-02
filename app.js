@@ -654,6 +654,31 @@ function logoPath(type, id) {
   if (!logoCache.has(k)) logoCache.set(k, tmdb(`${type}/${id}/images?include_image_language=ar,en,null`).then(r => pickLogo(r.logos)).catch(() => null));
   return logoCache.get(k);
 }
+/** Age rating (your region, else US / UK / …) and what the title contains, from TMDB — same rules as the apps. */
+const AGE_RULES = [['Violence', ['violen', 'violên', 'gewalt', 'fight', 'brutal', 'murder', 'killing']], ['Blood & gore', ['gore', 'blood', 'sangue', 'sangre', 'gory', 'splatter', 'dismember']],
+  ['Bad language', ['language', 'linguagem', 'lenguaje', 'profan', 'swear', 'coarse', 'obscen', 'crude']], ['Drugs', ['drug', 'droga', 'drogen', 'narcot', 'cocaine', 'heroin', 'marijuana', 'meth']],
+  ['Sex', ['sex', 'sexo', 'erotic']], ['Nudity', ['nud', 'naked', 'nackt']], ['Alcohol & smoking', ['alcohol', 'álcool', 'drunk', 'smok', 'tobacco', 'tabaco']],
+  ['Frightening scenes', ['horror', 'frighten', 'terror', 'medo', 'scary', 'disturbing', 'threat']], ['Self-harm', ['suicid', 'self-harm', 'self harm']]];
+const ageCache = new Map();
+function ageRating(type, id) {
+  const k = `${type}-${id}-${S.region}`;
+  if (!ageCache.has(k)) ageCache.set(k, (async () => {
+    const certs = {}, notes = [];
+    try {
+      const r = await tmdb(type === 'tv' ? `tv/${id}/content_ratings` : `movie/${id}/release_dates`);
+      for (const c of r.results || []) {
+        if (type === 'tv') { if (c.rating && !certs[c.iso_3166_1]) certs[c.iso_3166_1] = c.rating; notes.push(...(c.descriptors || [])); }
+        else for (const d of (c.release_dates || []).slice().sort((a, b) => (a.type === 3 ? 0 : 1) - (b.type === 3 ? 0 : 1))) { if (d.certification && !certs[c.iso_3166_1]) certs[c.iso_3166_1] = d.certification; notes.push(...(d.descriptors || [])); }
+      }
+    } catch { /* none */ }
+    try { const kw = await tmdb(`${type}/${id}/keywords`); for (const x of kw.keywords || kw.results || []) notes.push(x.name); } catch { /* none */ }
+    const raw = ([(S.region || 'US').toUpperCase(), 'US', 'GB', 'CA', 'AU', 'IE', 'DE', 'NL', 'FR'].map(c => certs[c]).find(Boolean) || Object.values(certs)[0] || '').trim();
+    const label = /^\d{1,2}$/.test(raw) ? raw + '+' : raw, text = notes.map(n => String(n).toLowerCase());
+    const adv = AGE_RULES.filter(([, ws]) => text.some(n => ws.some(w => n.includes(w)))).map(x => x[0]).slice(0, 6);
+    return label || adv.length ? { label, adv } : null;
+  })());
+  return ageCache.get(k);
+}
 /** Official trailer → teaser → anything, on YouTube. */
 function bestTrailer(videos) {
   const rank = v => ({ Trailer: 0, Teaser: 1 }[v.type] ?? 2) * 4 + (v.official ? 0 : 2) + (v.iso_639_1 === 'en' ? 0 : 1);
@@ -1380,7 +1405,7 @@ async function detailsView(type, id, token) {
       <button class="icon-btn mute-btn" id="d-mute" hidden aria-label="${T('Sound')}">${ic('volOff')}</button>
       <div class="d-info gutter"><div class="pst">${img(d.poster_path && IMG + 'w342' + d.poster_path)}</div>
         <div style="min-width:0;max-width:640px">${titleArt(pickLogo(d.images?.logos), titleOf(d), 'd-logo')}${d.tagline ? `<div class="tag">${esc(d.tagline)}</div>` : ''}
-          <div class="meta">${yearOf(d) ? `<span class="badge">${yearOf(d)}</span>` : ''}${d.vote_average ? `<span class="badge">★ ${d.vote_average.toFixed(1)}</span>` : ''}${runtime ? `<span class="badge">${Math.floor(runtime / 60) ? Math.floor(runtime / 60) + 'h ' : ''}${runtime % 60}m</span>` : ''}${type === 'tv' ? `<span class="badge">${seasons.length} ${T("Seasons")}</span>` : ''}</div>
+          <div class="meta">${yearOf(d) ? `<span class="badge">${yearOf(d)}</span>` : ''}${d.vote_average ? `<span class="badge">★ ${d.vote_average.toFixed(1)}</span>` : ''}${runtime ? `<span class="badge">${Math.floor(runtime / 60) ? Math.floor(runtime / 60) + 'h ' : ''}${runtime % 60}m</span>` : ''}<span id="d-age"></span>${type === 'tv' ? `<span class="badge">${seasons.length} ${T("Seasons")}</span>` : ''}</div>
           <div class="genres">${esc((d.genres || []).map(g => g.name).join(' • '))}</div>
           <div class="row-btns"><a class="btn white" href="${playHref}">${ic('play')}${esc(playLabel)}</a>
           <button class="icon-btn" id="wl" style="background:rgba(255,255,255,.14)" aria-label="Watchlist">${ic(e?.watch ? 'bookmark' : 'bookmarkO')}</button>
@@ -1389,6 +1414,7 @@ async function detailsView(type, id, token) {
     <p class="overview gutter">${esc(d.overview)}</p>
     ${type === 'tv' ? `<div class="chips gutter" id="seasons">${seasons.map(s => `<button class="chip ${s.season_number === season ? 'on' : ''}" data-n="${s.season_number}">${esc(s.name)}</button>`).join('')}</div><div class="eps gutter" id="eps"></div>` : ''}
     ${(d.credits?.cast || []).length ? `<div class="rail-title gutter">${T("Cast")}</div><div class="rail gutter">${d.credits.cast.slice(0, 20).map(c => `<div class="cast" role="link" tabindex="0" onclick="location.hash='#/person/${c.id}'">${c.profile_path ? `<img src="${IMG}w185${c.profile_path}" alt="" loading="lazy">` : '<div class="ph"></div>'}<span>${esc(c.name)}</span><span class="dim">${esc(c.character || '')}</span></div>`).join('')}</div>` : ''}`;
+  ageRating(type, id).then(a => { const el = $('#d-age'); if (el && a?.label) el.outerHTML = `<span class="badge age">${esc(a.label)}</span>`; });
   // The trailer starts by itself over the artwork (muted unless Settings → Appearance says sound; tap 🔇 for sound)
   const trKey = bestTrailer(d.videos);
   if (trKey) $('#d-tr').onclick = () => { detailTrailer?.stop(); $('#d-mute').hidden = true; trailerOverlay(trKey); };
@@ -1592,6 +1618,13 @@ function openPlayer() {
     else st.introLoaded = true;
   }, { once: true });
   v.play().catch(() => { /* user taps play */ });
+  // Age rating + what it contains, top-left for ~7 s once it starts (like Netflix)
+  if (r.id && !r.local && r.type !== 'live') v.addEventListener('playing', async () => {
+    const a = await ageRating(r.type, r.id); if (!a || PLAYER.el !== el) return;
+    const b = document.createElement('div'); b.className = 'p-adv';
+    b.innerHTML = `<i></i><div>${a.label ? `<b>${T('Rated')} ${esc(a.label)}</b>` : ''}${a.adv.length ? `<span>${a.adv.map(x => T(x).toLowerCase()).join(', ')}</span>` : ''}</div>`;
+    setTimeout(() => { if (PLAYER.el !== el) return; el.appendChild(b); setTimeout(() => { b.classList.add('out'); setTimeout(() => b.remove(), 800); }, 7000); }, 1200);
+  }, { once: true });
 
   // ---- controls visibility
   let hideT;

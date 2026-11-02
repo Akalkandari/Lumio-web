@@ -898,5 +898,19 @@ window.LUMIO_AR = {
 "No release date yet": "لا يوجد موعد عرض بعد",
 "Want a reminder when it comes out?": "هل تريد تذكيرًا عند عرضها؟",
 "Not now": "ليس الآن",
-"We'll let you know when it's out": "سنخبرك عند عرضها"
+"We'll let you know when it's out": "سنخبرك عند عرضها",
+"Play manually": "تشغيل يدوي",
+"Choose the source yourself": "اختر المصدر بنفسك",
+"Finding the best stream…": "جارٍ البحث عن أفضل مصدر…",
+"No stream found — choose one yourself": "لم يُعثر على مصدر — اختر واحدًا بنفسك",
+"Rated": "التصنيف",
+"Violence": "عنف",
+"Blood & gore": "دماء ومشاهد دموية",
+"Bad language": "ألفاظ نابية",
+"Drugs": "مخدرات",
+"Sex": "مشاهد جنسية",
+"Nudity": "عُري",
+"Alcohol & smoking": "كحول وتدخين",
+"Frightening scenes": "مشاهد مخيفة",
+"Self-harm": "إيذاء النفس"
 };
