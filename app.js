@@ -1635,7 +1635,7 @@ async function quickPlay(type, id, season, episode) {
 /** Click = [tap]; touch-and-hold or right-click = [hold] (used for Play buttons and episodes). */
 function tapOrHold(el, tap, hold) {
   let t = null, held = false;
-  el.addEventListener('touchstart', () => { held = false; t = setTimeout(() => { held = true; navigator.vibrate?.(15); hold(); }, 500); }, { passive: true });
+  el.addEventListener('touchstart', () => { held = false; t = setTimeout(() => { held = true; haptic('tap'); hold(); }, 500); }, { passive: true });
   ['touchend', 'touchmove', 'touchcancel'].forEach(ev => el.addEventListener(ev, () => clearTimeout(t), { passive: true }));
   el.addEventListener('contextmenu', e => { e.preventDefault(); hold(); });
   el.addEventListener('click', e => { e.preventDefault(); if (held) { held = false; return; } tap(); });
@@ -2122,6 +2122,25 @@ function popup(header, opts) {
   bg.querySelectorAll('.opt').forEach(b => b.onclick = () => { closePop(); opts[+b.dataset.i].fn(); });
   document.body.appendChild(bg);
 }
+/**
+ * Haptics. Android (Chrome) uses the vibration motor directly. iPhone Safari has no vibrate(), but toggling a hidden
+ * system switch gives the phone's own light "tick" (Safari 18+), so we use that and repeat it for success / errors.
+ */
+const haptic = (() => {
+  let sw = null;
+  const tick = () => {
+    if (!sw) { const l = document.createElement('label'); l.setAttribute('aria-hidden', 'true'); l.style.cssText = 'position:fixed;left:-99px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+      l.innerHTML = '<input type="checkbox" switch tabindex="-1">'; document.body.appendChild(l); sw = l; }
+    sw.click();
+  };
+  const P = { tap: [10, 1], del: [6, 1], ok: [[14, 70, 22], 2], error: [[45, 55, 45, 55, 70], 3] };
+  return kind => {
+    const [pat, n] = P[kind] || P.tap;
+    try { if (navigator.vibrate) { navigator.vibrate(pat); return; } } catch { }
+    if (!/iP(hone|ad|od)|Macintosh/.test(navigator.userAgent) || !('ontouchend' in document)) return;
+    for (let i = 0; i < n; i++) setTimeout(tick, i * 110);
+  };
+})();
 /** 4-digit PIN pad. setNew → enter + confirm, resolves with the PIN; otherwise resolves true once `check(pin)` passes. */
 function pinPad({ title, setNew, check }) {
   return new Promise(resolve => {
@@ -2136,8 +2155,8 @@ function pinPad({ title, setNew, check }) {
     document.body.appendChild(bg);
     const dots = bg.querySelectorAll('#dots i'), err = $('#perr', bg);
     const paint = () => dots.forEach((d, i) => d.classList.toggle('on', i < pin.length));
-    const done = v => { bg.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
-    const fail = m => { err.textContent = T(m); pin = ''; paint(); const box = $('.pop', bg); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); navigator.vibrate?.(60); };
+    const done = v => { if (v) haptic('ok'); bg.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const fail = m => { err.textContent = T(m); pin = ''; paint(); const box = $('.pop', bg); box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake'); haptic('error'); };
     const complete = async () => {
       if (setNew) {
         if (first == null) { first = pin; pin = ''; paint(); $('#pinh', bg).textContent = head(); err.innerHTML = '&nbsp;'; }
@@ -2145,7 +2164,7 @@ function pinPad({ title, setNew, check }) {
         else { first = null; $('#pinh', bg).textContent = head(); fail("PINs don't match. Try again."); }
       } else if (await check(pin)) done(true); else fail('Wrong PIN');
     };
-    const press = k => { if (k === 'del') { pin = pin.slice(0, -1); paint(); return; } if (pin.length < 4) { pin += k; paint(); if (pin.length === 4) setTimeout(complete, 120); } };
+    const press = k => { if (k === 'del') { if (pin) haptic('del'); pin = pin.slice(0, -1); paint(); return; } if (pin.length < 4) { haptic('tap'); pin += k; paint(); if (pin.length === 4) setTimeout(complete, 120); } };
     bg.querySelectorAll('.pad button').forEach(b => b.onclick = () => press(b.dataset.k));
     const onKey = e => { if (/^\d$/.test(e.key)) press(e.key); else if (e.key === 'Backspace') press('del'); else if (e.key === 'Escape') done(null); };
     document.addEventListener('keydown', onKey);
@@ -2212,7 +2231,7 @@ let lpTimer = null, lpFired = false, lpXY = null;
 document.addEventListener('touchstart', e => {
   const p = e.target.closest('.poster'); if (!p) return;
   lpFired = false; const t = e.touches[0]; lpXY = [t.clientX, t.clientY];
-  clearTimeout(lpTimer); lpTimer = setTimeout(() => { lpFired = true; navigator.vibrate?.(15); p.classList.add('pressed'); setTimeout(() => p.classList.remove('pressed'), 250); openPosterMenu(p); }, 480);
+  clearTimeout(lpTimer); lpTimer = setTimeout(() => { lpFired = true; haptic('tap'); p.classList.add('pressed'); setTimeout(() => p.classList.remove('pressed'), 250); openPosterMenu(p); }, 480);
 }, { passive: true });
 document.addEventListener('touchmove', e => { if (!lpXY) return; const t = e.touches[0]; if (Math.hypot(t.clientX - lpXY[0], t.clientY - lpXY[1]) > 10) clearTimeout(lpTimer); }, { passive: true });
 ['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, () => clearTimeout(lpTimer), { passive: true }));
