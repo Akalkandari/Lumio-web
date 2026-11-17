@@ -289,6 +289,7 @@ const P = {
   full: 'M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z',
   rew: 'M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z',
   fwd: 'M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z',
+  download: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
   close: 'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
   check: 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
   eyeoff: 'M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.43-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z',
@@ -1752,6 +1753,7 @@ async function detailsView(type, id, token) {
           <div class="row-btns"><a class="btn white" id="d-play" href="${playHref}" title="${T('Hold or right-click to choose the source yourself')}">${ic('play')}${esc(playLabel)}</a>
           <button class="icon-btn" id="wl" style="background:rgba(255,255,255,.14)" aria-label="Watchlist">${ic(e?.watch ? 'bookmark' : 'bookmarkO')}</button>
           ${SESSION ? `<button class="icon-btn" id="d-tv" style="background:rgba(255,255,255,.14)" aria-label="${esc(T('Play on TV'))}" title="${esc(T('Play on TV'))}">${ic('livetv')}</button>` : ''}
+          <button class="icon-btn" id="d-dl" style="background:rgba(255,255,255,.14)" aria-label="${esc(T('Download'))}" title="${esc(T('Download'))}">${ic('download')}</button>
           ${bestTrailer(d.videos) ? `<button class="btn tonal" id="d-tr">${ic('movie')}${T('Trailer')}</button>` : ''}</div>
         </div></div></div>
     <p class="overview gutter">${esc(d.overview)}</p>
@@ -1776,6 +1778,7 @@ async function detailsView(type, id, token) {
   }, 1200);
   // Play: the best stream straight away; hold / right-click: the sources list
   tapOrHold($('#d-play'), () => quickPlay(type, id, type === 'tv' ? (resume?.season || season) : null, type === 'tv' ? (resume?.episode || 1) : null), () => { location.hash = playHref; });
+  $('#d-dl').onclick = () => downloadSheet(type, id, type === 'tv' ? season : null);
   if ($('#d-tv')) $('#d-tv').onclick = () => playOnTv({ type, id, title: titleOf(d), season: type === 'tv' ? (resume?.season || season) : null, episode: type === 'tv' ? (resume?.episode || 1) : null });
   $('#wl').onclick = () => {
     updateLib(type, id, cur => Object.assign(cur || { type, id, title: titleOf(d), poster: d.poster_path, backdrop: d.backdrop_path, pos: 0, dur: 0 }, cur && cur.watch ? { watch: false } : { watch: true, noUp: false }));
@@ -1939,6 +1942,63 @@ function dissolve(el, then) {
 // ============================================================================ play straight away
 /** Press Play → the best stream starts by itself (no sources list). Hold / right-click → choose the source yourself. */
 let QP = 0;
+// ---- downloads (website): the same copy the apps would download, saved through the browser's own downloads
+/** The best copy, as Play would pick it, but not bigger than 1080p (same rule as the app's DownloadPick). */
+const dlPick = ranked => ranked.find(x => x.q !== '4K') || ranked[0] || null;
+/** "Black Doves S01E02.mkv" — the file's own type when its address shows one. */
+const dlName = (title, season, episode, url) => {
+  const ext = ((String(url || '').split(/[?#]/)[0].match(/\.(mkv|mp4|m4v|webm|avi|mov|ts)$/i) || [])[1] || 'mp4').toLowerCase();
+  const clean = String(title || 'Video').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const pad = n => String(n).padStart(2, '0');
+  return `${clean}${season != null ? ` S${pad(season)}E${pad(episode)}` : ''}.${ext}`;
+};
+/** Download sheet (website): a film straight away, a series → choose episodes; then a Save button per file. */
+async function downloadSheet(type, id, startSeason) {
+  const d = await api.details(type, id), title = titleOf(d), imdb = d.imdb_id || d.external_ids?.imdb_id;
+  const root = $('#sheet-root');
+  const frame = inner => {
+    root.innerHTML = `<div class="sheet-bg"></div><div class="sheet dl-sheet" role="dialog" aria-label="${esc(T('Download'))}"><div class="grab"></div>
+      <div class="dl-top">${img(d.backdrop_path && IMG + 'w780' + d.backdrop_path)}<div><b>${esc(title)}</b><small>${T(type === 'tv' ? 'Download episodes' : 'Download')}</small></div></div>${inner}</div>`;
+    $('.sheet-bg', root).onclick = closeSheet;
+  };
+  // find each file, then list them with Save buttons (a click per file: browsers only allow downloads you start)
+  const resolve = async picks => {
+    frame(`<div class="dl-busy"><span class="mini-spin"></span>${T('Finding the best copy…')}</div>`);
+    const out = [];
+    for (const p of picks) {
+      const best = dlPick(rankStreams(await getStreams(type, imdb, p.season, p.episode).catch(() => []), d.original_language));
+      out.push({ ...p, best });
+    }
+    if (!root.querySelector('.dl-sheet')) return;   // closed meanwhile
+    frame(`<div class="dl-list">${out.map(o => `<div class="dl-file">
+        <div><b>${esc(o.season != null ? `S${o.season} E${o.episode}${o.name ? ' · ' + o.name : ''}` : title)}</b>
+        <small>${o.best ? esc([o.best.q, o.best.gb ? o.best.gb + ' GB' : '', o.best.addon].filter(Boolean).join(' · ')) : T('No stream found to download')}</small></div>
+        ${o.best ? `<a class="btn acc" href="${esc(o.best.url)}" download="${esc(dlName(title, o.season, o.episode, o.best.url))}" target="_blank" rel="noopener noreferrer">${ic('download')}${T('Save')}</a>` : ''}</div>`).join('')}</div>
+      <p class="dl-hint">${T('Each file saves through your browser. If one opens in a new tab instead, use the browser’s Save option there.')}</p>`);
+  };
+  if (!imdb || !S.addons.some(a => supports(a, 'stream'))) { toast(T('No stream found to download')); return; }
+  if (type !== 'tv') return resolve([{ season: null, episode: null }]);
+  // series: season chips, episodes with a tick, Select all, Download N episodes
+  const seasons = (d.seasons || []).filter(s => s.season_number > 0);
+  const chosen = new Map(); let season = seasons.some(s => s.season_number === startSeason) ? startSeason : seasons[0]?.season_number ?? 1;
+  const cache = {};
+  const draw = async () => {
+    const eps = cache[season] || (cache[season] = await api.season(id, season).catch(() => []));
+    const sel = chosen.get(season) || new Set(), total = [...chosen.values()].reduce((n, s) => n + s.size, 0), all = eps.length && eps.every(e => sel.has(e.episode_number));
+    frame(`<div class="chips dl-seasons">${seasons.map(s => { const c = chosen.get(s.season_number)?.size; return `<button class="chip ${s.season_number === season ? 'on' : ''}" data-n="${s.season_number}">${esc(s.name)}${c ? ' · ' + c : ''}</button>`; }).join('')}</div>
+      <div class="dl-bar"><span>${sel.size} ${T('of')} ${eps.length} ${T('selected')}</span>${eps.length ? `<button class="btn acc sm" id="dl-all">${T(all ? 'Clear' : 'Select all')}</button>` : ''}</div>
+      <div class="dl-eps">${eps.map(e => `<button class="dl-ep ${sel.has(e.episode_number) ? 'on' : ''}" data-e="${e.episode_number}">
+        <span class="st">${e.still_path ? `<img src="${IMG}w300${e.still_path}" alt="" loading="lazy">` : ''}<i>${e.episode_number}</i></span>
+        <span class="tx"><b>${esc(e.name || T('Episode') + ' ' + e.episode_number)}</b><small>S${season} E${e.episode_number}</small></span><span class="ck">${sel.has(e.episode_number) ? ic('check') : ''}</span></button>`).join('')}</div>
+      <div class="dl-go"><small>${total} ${T(total === 1 ? 'episode' : 'episodes')}</small><button class="btn acc" id="dl-go" ${total ? '' : 'disabled'}>${ic('download')}${total ? (total === 1 ? T('Download 1 episode') : `${T('Download')} ${total} ${T('episodes')}`) : T('Choose episodes')}</button></div>`);
+    root.querySelectorAll('.dl-seasons .chip').forEach(b => b.onclick = () => { season = +b.dataset.n; draw(); });
+    root.querySelectorAll('.dl-ep').forEach(b => b.onclick = () => { const s = chosen.get(season) || new Set(), n = +b.dataset.e; s.has(n) ? s.delete(n) : s.add(n); chosen.set(season, s); draw(); });
+    $('#dl-all', root) && ($('#dl-all', root).onclick = () => { chosen.set(season, all ? new Set() : new Set(eps.map(e => e.episode_number))); draw(); });
+    $('#dl-go', root).onclick = () => resolve([...chosen.entries()].sort((a, b) => a[0] - b[0]).flatMap(([s, set]) =>
+      [...set].sort((a, b) => a - b).map(n => ({ season: s, episode: n, name: (cache[s] || []).find(e => e.episode_number === n)?.name || '' }))));
+  };
+  draw();
+}
 async function quickPlay(type, id, season, episode) {
   const my = ++QP;
   document.querySelector('.qp')?.remove();
