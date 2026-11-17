@@ -2156,6 +2156,7 @@ function linkPlay(tv) {
 }
 /** The title page's "Play on TV" button: pick one of your TVs (signed in to this account, Lumio open) and it plays there. */
 function playOnTv(want) {
+  if (typeof stopPageTrailers === 'function') stopPageTrailers();   // the title page's trailer stops while the Cast window is open
   // already casting this to a Chromecast: its controls come back
   if (CAST.kind === 'chromecast' && CAST.np) return castOpen();
   LINK.want = want; if (SESSION) linkConnect(); linkSheet(true);
@@ -2194,12 +2195,19 @@ function castPick(ranked) {
   const hevc = x => /X265|HEVC|H\.?265/i.test(t(x)), plain = x => /\.(mp4|m4v|m3u8)$/i.test(String(x.url || '').split('?')[0]) || /\bMP4\b/i.test(t(x));
   return small.find(x => !hevc(x) && plain(x)) || small.find(x => !hevc(x)) || small[0] || ranked[0] || null;
 }
-/** The copies a Chromecast tries, best first (if one won't play, the next): up to 3. */
+/**
+ * The copies a Chromecast tries, best first (if one won't play, the next): up to 3 — the app's CastPick.candidates.
+ * Picture first (H.264 up to 1080p, then HEVC, then 4K), then sound it can play (AAC before Dolby; DTS / TrueHD last:
+ * a Google TV Streamer plays those silent), then a plain MP4 / HLS file; otherwise the ranking's own order.
+ */
 function castCandidates(ranked) {
-  const small = ranked.filter(x => x.q !== '4K'), t = x => `${x.label || ''} ${x.details || ''}`;
-  const hevc = x => /X265|HEVC|H\.?265/i.test(t(x)), plain = x => /\.(mp4|m4v|m3u8)$/i.test(String(x.url || '').split('?')[0]) || /\bMP4\b/i.test(t(x));
+  const t = x => `${x.label || ''} ${x.details || ''}`.toUpperCase();
+  const hevc = x => /X265|HEVC|H\.?265/.test(t(x)), plain = x => /\.(mp4|m4v|m3u8)$/i.test(String(x.url || '').split('?')[0]) || /\bMP4\b/.test(t(x));
+  const tier = x => x.q === '4K' ? 2 : hevc(x) ? 1 : 0;
+  const sound = x => /\bDTS\b|DTS-HD|DTS:X|TRUE-?HD/.test(t(x)) ? 2 : /\bDDP|\bDD\+|\bDD[ .]?[257]\.1|\bDD\b|E-?AC-?3|\bAC-?3\b|ATMOS|DOLBY DIGITAL/.test(t(x)) ? 1 : 0;
   const seen = new Set();
-  return [...small.filter(x => !hevc(x) && plain(x)), ...small.filter(x => !hevc(x)), ...small, ...ranked].filter(x => !seen.has(x.url) && seen.add(x.url)).slice(0, 3);
+  return ranked.filter(x => !seen.has(x.url) && seen.add(x.url)).map((x, i) => [x, i])
+    .sort((a, b) => tier(a[0]) - tier(b[0]) || sound(a[0]) - sound(b[0]) || (plain(a[0]) ? 0 : 1) - (plain(b[0]) ? 0 : 1) || a[1] - b[1]).map(p => p[0]).slice(0, 3);
 }
 /** The now-playing card (Lumio TV or Chromecast) */
 const CAST = { kind: null, tv: null, np: null, tab: 0, tracks: false, dragging: false, cc: null };
@@ -2259,13 +2267,27 @@ function castTimes(f) {
   const d = CAST.np?.dur || 0, a = $('#cc-a'), b = $('#cc-b');
   if (a) a.textContent = fmt(f * d); if (b) b.textContent = '−' + fmt(d - f * d);
 }
+/** While something is casting: a small floating Cast button on every page brings its controls back. */
+function castFab() {
+  let b = document.getElementById('cast-fab');
+  const show = !!(CAST.kind && CAST.np) && !PLAYER.el;
+  if (!show) { b?.remove(); return; }
+  if (b) return;
+  b = document.createElement('button'); b.id = 'cast-fab'; b.className = 'cast-fab';
+  b.setAttribute('aria-label', T('Casting controls')); b.innerHTML = ic('cast');
+  b.onclick = () => castOpen();
+  document.body.appendChild(b);
+}
+setInterval(castFab, 1500);
 function castUpdate() {
+  castFab();
   const np = CAST.np; if (!np || !$('#cast-card')) return;
   const pp = $('#cc-pp'); if (pp) pp.innerHTML = ic(np.playing ? 'pause' : 'play');
   const f = np.dur ? np.pos / np.dur : 0, seek = $('#cc-seek');
   if (seek && !CAST.dragging) { seek.value = Math.round(f * 1000); castTimes(f); }
 }
 function castDisconnect() {
+  setTimeout(castFab, 0);
   if (CAST.kind === 'chromecast') { try { cast.framework.CastContext.getInstance().endCurrentSession(false); } catch { /* not connected */ } }
   Object.assign(CAST, { kind: null, tv: null, np: null, tracks: false, cc: null });
 }

@@ -1106,5 +1106,16 @@ window.LUMIO_AR = {
 "Chromecast needs Chrome on a computer or an Android phone.": "يحتاج Chromecast إلى متصفح Chrome على حاسوب أو هاتف Android.",
 "Seek": "تقديم/ترجيع",
 "Connecting to": "جارٍ الاتصال بـ",
-"Trying another copy…": "جارٍ تجربة نسخة أخرى…"
+"Trying another copy…": "جارٍ تجربة نسخة أخرى…",
+"No previews for your IPTV provider's videos": "لا توجد معاينات لفيديوهات مزوّد IPTV",
+"This TV can't decode a second video for previews": "هذا التلفاز لا يستطيع تشغيل فيديو ثانٍ للمعاينات",
+"No previews for this video": "لا توجد معاينات لهذا الفيديو",
+"Loading previews…": "جارٍ تحميل المعاينات…",
+"This video can't show previews": "لا يمكن عرض معاينات لهذا الفيديو",
+"Previews took too long for this video": "استغرقت المعاينات وقتًا طويلًا لهذا الفيديو",
+"This device can't show previews": "هذا الجهاز لا يستطيع عرض المعاينات",
+"Previews aren't ready": "المعاينات غير جاهزة",
+"No sound? Try another copy": "لا يوجد صوت؟ جرّب نسخة أخرى",
+"No other copy to try": "لا توجد نسخة أخرى للتجربة",
+"Casting controls": "التحكم في البث"
 };
