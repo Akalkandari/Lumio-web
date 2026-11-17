@@ -1104,5 +1104,7 @@ window.LUMIO_AR = {
 "Subtitles from the website aren’t available on a Chromecast. Cast from the phone app to get them.": "الترجمة من الموقع غير متاحة على Chromecast. استخدم تطبيق الهاتف للبث مع الترجمة.",
 "Subtitle style can be changed when casting to a Lumio TV.": "يمكن تغيير نمط الترجمة عند البث إلى تلفاز يعمل عليه Lumio.",
 "Chromecast needs Chrome on a computer or an Android phone.": "يحتاج Chromecast إلى متصفح Chrome على حاسوب أو هاتف Android.",
-"Seek": "تقديم/ترجيع"
+"Seek": "تقديم/ترجيع",
+"Connecting to": "جارٍ الاتصال بـ",
+"Trying another copy…": "جارٍ تجربة نسخة أخرى…"
 };
