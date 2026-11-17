@@ -414,6 +414,15 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .p-seek { position: relative; height: 26px; display: flex; align-items: center; touch-action: none; margin-top: 8px; cursor: pointer; }
 .p-seek .tr { position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px; background: rgba(255,255,255,.18); overflow: hidden; transition: height .15s; }
 .p-seek:hover .tr { height: 7px; }
+.p-strip { position: absolute; bottom: 30px; left: 0; width: 200px; height: 150px; transform: translateX(-50%); pointer-events: none; z-index: 2; }
+.p-strip canvas { position: absolute; top: 15px; width: 140px; height: 79px; border-radius: 9px; opacity: .55; object-fit: cover; }
+.p-strip > canvas:first-child { left: -84px; }
+.p-strip > canvas:last-child { right: -84px; }
+.p-strip .mid { position: absolute; left: 0; right: 0; top: 0; display: flex; flex-direction: column; align-items: center; z-index: 1; }
+.p-strip .mid canvas { position: static; width: 200px; height: 112px; opacity: 1; border: 1.5px solid rgba(255,255,255,.85); box-shadow: 0 10px 30px rgba(0,0,0,.55); background: #000; }
+.p-strip b { margin-top: 6px; font-size: 16px; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+.p-strip small { font-size: 12px; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+.p-strip small:empty { display: none; }
 .p-seek .buf { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,255,255,.3); }
 .p-seek .cur { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
 .p-seek .th { position: absolute; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent); transform: scale(.7); transition: transform .15s; }

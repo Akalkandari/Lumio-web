@@ -2127,6 +2127,7 @@ function closePlayer(fromRoute, skipSave) {
   if (!PLAYER.el) return;
   if (!skipSave) saveProgress();
   try { PLAYER.hls?.destroy(); PLAYER.hls = null; PLAYER.v.pause(); PLAYER.v.removeAttribute('src'); PLAYER.v.load(); } catch { /* ignore */ }
+  PLAYER.thumbs?.close(); PLAYER.thumbs = undefined;
   clearInterval(PLAYER.saveT); clearInterval(PLAYER.partyT);
   PLAYER.el.remove(); PLAYER.el = null; PLAYER.v = null;
   if (isCtl()) pPublish();   // host closed the player → party pauses
@@ -2150,6 +2151,49 @@ function stopPageTrailers() {
   document.querySelectorAll('iframe.yt').forEach(f => { if (!f.closest('.player')) f.remove(); });
   document.querySelectorAll('.pv-pop, .trailer-full').forEach(x => x.remove());
 }
+// ---- seek previews: the spot and one picture before / after it (same rules as the app's SeekStrip)
+const STRIP_STEP = 10000;
+const stripGap = d => Math.min(120000, Math.max(10000, Math.floor((Math.floor(d / 40) + 5000) / 10000) * 10000));
+const stripTimes = (t, d) => {
+  const at = Math.floor(Math.max(0, Math.min(t, Math.max(0, d))) / STRIP_STEP) * STRIP_STEP, g = stripGap(d);
+  return { prev: at - g >= 0 ? at - g : null, at, next: at + g < d ? at + g : null };
+};
+const stripJump = (t, cur) => { const d = t - cur; return Math.abs(d) < 1000 ? '' : (d > 0 ? '+' : '−') + fmt(Math.abs(d)); };
+/** Seek previews in the website player: a muted copy of the video jumps to the spot and its picture is kept. */
+function seekPictures(url) {
+  // plain video files only (like the apps): streamed playlists (.m3u8 / .mpd) have no cheap way to jump around
+  if (!/^https?:|^blob:/i.test(url || '') || /\.(m3u8|mpd)(\?|$)/i.test(url)) return null;
+  const pv = document.createElement('video');
+  pv.muted = true; pv.preload = 'metadata'; pv.playsInline = true; pv.src = url;
+  const pics = new Map(); let dead = false, queue = [], running = false;
+  pv.addEventListener('error', () => { dead = true; });
+  const grab = t => new Promise(res => {
+    let to;
+    const done = ok => {
+      pv.removeEventListener('seeked', on); clearTimeout(to);
+      if (!ok) return res(null);
+      const c = document.createElement('canvas'); c.width = 320; c.height = 180;
+      try { c.getContext('2d').drawImage(pv, 0, 0, 320, 180); } catch { return res(null); }
+      pics.set(t, c); if (pics.size > 24) pics.delete(pics.keys().next().value);
+      res(c);
+    };
+    const on = () => done(true);
+    pv.addEventListener('seeked', on);
+    to = setTimeout(() => { if (!pics.size) dead = true; done(false); }, 6000);   // the first one never came: no previews for this video
+    try { pv.currentTime = t / 1000; } catch { done(false); }
+  });
+  async function pump(onPic) {
+    if (running) return; running = true;
+    while (queue.length && !dead) { const t = queue.shift(); if (!pics.has(t) && await grab(t)) onPic(t); }
+    running = false;
+  }
+  return {
+    get: t => pics.get(t), dead: () => dead,
+    /** the newest request wins: the spot first, then the pictures either side */
+    want(times, onPic) { queue = times.filter(t => t != null && !pics.has(t)); pump(onPic); },
+    close() { dead = true; queue = []; try { pv.removeAttribute('src'); pv.load(); } catch { /* ignore */ } },
+  };
+}
 function openPlayer() {
   if (PLAYER.el) closePlayer(true, true); // switching episode: progress already saved
   stopPageTrailers();
@@ -2170,7 +2214,7 @@ function openPlayer() {
       <div class="p-bot">
         <div class="p-title">${live ? `<span class="p-live">${T('LIVE')}</span>` : ''}<b>${esc(r.title)}</b></div>
         <div class="p-meta" id="pmeta">${esc(r.subtitle || '')}</div><div class="p-next" id="pnext"></div>
-        ${live ? '<div class="p-prog" id="pprog" hidden><i></i></div>' : `<div class="p-seek" id="seek"><div class="tr"><div class="buf" id="sbuf"></div><div class="cur" id="scur"></div></div><div class="th" id="sth"></div></div>`}
+        ${live ? '<div class="p-prog" id="pprog" hidden><i></i></div>' : `<div class="p-seek" id="seek"><div class="p-strip" id="pstrip" hidden><canvas width="320" height="180"></canvas><div class="mid"><canvas width="320" height="180"></canvas><b></b><small></small></div><canvas width="320" height="180"></canvas></div><div class="tr"><div class="buf" id="sbuf"></div><div class="cur" id="scur"></div></div><div class="th" id="sth"></div></div>`}
         <div class="p-row"><div class="p-btns"><button id="bsub">${ic('subs')}<span>${T("Subtitles")}</span></button><button id="baud">${ic('audio')}<span>${T("Audio")}</span></button>${live ? '' : `<button id="bspd">${ic('speed')}<span>${T("Speed")}</span></button>`}
           <button id="bsize">${ic('aspect')}<span>${T("Size")}</span></button>${live ? '' : `<button id="bscn">${ic('eyeOff')}<span>${T("Scenes")}</span></button>`}<button id="bopen">${ic('open')}<span>${T("Open in…")}</span></button><button id="bfull">${ic('full')}<span>${T("Full screen")}</span></button></div>
           <span class="p-clock" id="ptime">${live ? '' : '0:00 / 0:00'}</span></div></div>
@@ -2439,9 +2483,37 @@ function openPlayer() {
   };
   requestAnimationFrame(tick);
   const fracAt = e => { const b = seek.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)); };
-  seek.addEventListener('pointerdown', e => { e.stopPropagation(); scrubbing = true; seek.setPointerCapture(e.pointerId); paint(fracAt(e)); showUI(); });
-  seek.addEventListener('pointermove', e => { if (!scrubbing) return; const f = fracAt(e); paint(f); timeEl.textContent = `${fmt(f * v.duration * 1000)} / ${fmt(v.duration * 1000)}`; showUI(); });
-  seek.addEventListener('pointerup', e => { if (!scrubbing) return; scrubbing = false; v.currentTime = fracAt(e) * (v.duration || 0); });
+  // picture strip while dragging (or pointing with a mouse): the spot, a little before and after, the time and the jump
+  const strip = $('#pstrip', el), [sPrev, sMid, sNext] = strip.querySelectorAll('canvas'), sTime = $('b', strip), sJump = $('small', strip);
+  let shownAt = null;
+  const drawPic = (cv, t, keep) => {
+    const pic = t != null && PLAYER.thumbs?.get(t);
+    if (pic) { cv.getContext('2d').drawImage(pic, 0, 0); cv.style.visibility = ''; } else if (!keep) cv.style.visibility = 'hidden';
+    return !!pic;
+  };
+  const preview = f => {
+    const d = (v.duration || 0) * 1000; if (!d) return;
+    if (PLAYER.thumbs === undefined) PLAYER.thumbs = seekPictures(v.currentSrc || r.url);   // made on first use
+    const pics = PLAYER.thumbs; if (!pics || pics.dead()) return (strip.hidden = true);
+    const t = f * d, times = stripTimes(t, d);
+    sTime.textContent = fmt(t); sJump.textContent = stripJump(t, v.currentTime * 1000);
+    strip.style.left = f * 100 + '%';
+    const redraw = () => {
+      if (drawPic(sMid, times.at, true)) shownAt = times.at;
+      drawPic(sPrev, times.prev); drawPic(sNext, times.next);
+      strip.hidden = shownAt == null;
+    };
+    redraw();
+    pics.want([times.at, times.prev, times.next], redraw);
+  };
+  const hidePreview = () => { strip.hidden = true; };
+  seek.addEventListener('pointerdown', e => { e.stopPropagation(); scrubbing = true; seek.setPointerCapture(e.pointerId); paint(fracAt(e)); preview(fracAt(e)); showUI(); });
+  seek.addEventListener('pointermove', e => {
+    if (!scrubbing) { if (e.pointerType === 'mouse') preview(fracAt(e)); return; }
+    const f = fracAt(e); paint(f); preview(f); timeEl.textContent = `${fmt(f * v.duration * 1000)} / ${fmt(v.duration * 1000)}`; showUI();
+  });
+  seek.addEventListener('pointerleave', () => { if (!scrubbing) hidePreview(); });
+  seek.addEventListener('pointerup', e => { if (!scrubbing) return; scrubbing = false; hidePreview(); v.currentTime = fracAt(e) * (v.duration || 0); });
   }
 
   // ---- keyboard (computers, TV browsers): Space/K play, ←/→ ±10 s, ↑/↓ volume, M mute, F full screen,
