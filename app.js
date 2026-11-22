@@ -1084,12 +1084,25 @@ async function introSegments(type, id, season, episode, durMs) {
 /** [first] = the main picture of the screen: fetched straight away at high priority (everything else waits until it's near). */
 function img(src, alt = '', first = false) { return src ? `<img src="${esc(src)}" alt="${esc(alt)}" ${first ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" data-ok>` : ''; }
 const badgesHTML = e => `${e && e.watched ? `<span class="watched" title="${T('Watched')}">${ic('check')}</span>` : ''}${e && e.pin ? `<span class="locked">${ic('lock')}</span>` : ''}`;
+/** Continue Watching: which episode (S2 E5) and how much is left ("42m left"), over the progress line. Same as the apps. */
+function contLabel(type, season, episode, pos, dur, ar = S.lang === 'ar') {
+  const ep = type === 'tv' && season != null && episode != null ? `S${season} E${episode}` : null;
+  let left = null;
+  if (dur > 0) {
+    const mins = Math.floor(Math.max(0, dur - Math.min(Math.max(pos, 0), dur)) / 60000), h = Math.floor(mins / 60), m = mins % 60;
+    if (mins < 1) left = ar ? 'متبقٍّ أقل من دقيقة' : '<1m left';
+    else left = ar ? 'متبقٍّ ' + [h ? `${h} س` : '', m ? `${m} د` : ''].filter(Boolean).join(' ')
+      : [h ? `${h}h` : '', m ? `${m}m` : ''].filter(Boolean).join(' ') + ' left';
+  }
+  return [ep, left].filter(Boolean).join(' · ') || null;
+}
 function posterCard(x, i = 0, prog, cont, from = '') {
   const t = x.media_type || 'movie', e = libEntry(t, x.id);
   return `<a class="poster fly" style="animation-delay:${Math.min(i, 12) * 28}ms" href="#/details/${t}/${x.id}" data-k="${t}-${x.id}" data-type="${t}" data-id="${x.id}" ${cont ? 'data-cont="1"' : ''} ${from ? `data-from="${from}"` : ''} data-title="${esc(titleOf(x))}" data-poster="${esc(x.poster_path || '')}" data-year="${yearOf(x)}">
     <div class="art">${img(x.poster_path && IMG + 'w342' + x.poster_path, titleOf(x))}
       ${x.vote_average ? `<span class="rate"><b>★</b> ${x.vote_average.toFixed(1)}</span>` : ''}
       <span class="badges">${badgesHTML(e)}</span>
+      ${prog && cont && e && !e.newEp ? (l => l ? `<span class="cont-label">${esc(l)}</span>` : '')(contLabel(t, e.season, e.episode, e.pos, e.dur)) : ''}
       ${prog ? `<span class="prog"><i style="width:${prog * 100}%"></i></span>` : ''}</div>
     <div class="t">${esc(titleOf(x))}</div>${yearOf(x) ? `<div class="y">${yearOf(x)}</div>` : ''}</a>`;
 }
