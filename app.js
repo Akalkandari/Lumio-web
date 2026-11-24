@@ -9,6 +9,7 @@ const BUILT_IN_ADDONS = [
   { url: 'https://v3-cinemeta.strem.io/manifest.json', name: 'Cinemeta', resources: ['catalog', 'meta'], builtIn: true },
   { url: 'https://opensubtitles-v3.strem.io/manifest.json', name: 'OpenSubtitles', resources: ['subtitles'], builtIn: true },
   { url: 'https://subdl.strem.top/c3ViZGxfM1ZZYVFfcUVoa2d1a0hOZlBlSXBDTFVHNWczS0NfRTF1bFBJMzI2M2lOQS9BUi9oaUV4Y2x1ZGUv/manifest.json', name: 'SubDL Subtitles', resources: ['subtitles'], builtIn: true },
+  { url: 'https://popcorn-notes.lsoares.workers.dev/langs=ara&skip=trivia,goofs,characters,recap&soundtrack=on&ads=on/manifest.json', name: '🍿 Subtitles: Extended', resources: ['subtitles'], builtIn: true },   // Popcorn Notes (v5)
 ];
 // Background themes (Settings → Appearance), the same as the apps: [key, name, about, page, card, raised card, glows]
 // where a glow is [colour or 'accent', x, y, size, strength], a soft pool of light fixed behind the page.
@@ -366,7 +367,7 @@ const sharingAddons = () => { const p = activeProfile(); return p.id !== MAIN &&
 const hexToLong = h => 0xFF000000 + parseInt(String(h).replace('#', '').slice(0, 6) || '7C5CFF', 16);
 const longToHex = n => '#' + ((Number(n) >>> 0) & 0xFFFFFF).toString(16).padStart(6, '0').toUpperCase();
 function rawSettings(id) { const v = jparse(CD[kS(id)], null); return v || (id === MAIN ? {} : rawSettings(MAIN)); }
-const BUILT_IN_ADDONS_VERSION = 4;
+const BUILT_IN_ADDONS_VERSION = 5;   // v5: Popcorn Notes subtitles
 /** The old Classic look's olive custom colour (yellow-green) — switched once to Midnight (v4, same as the apps). */
 function isOliveHex(h) { const [r, g, b] = [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16) / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   if (mx === mn || mx === 0) return false; const s = (mx - mn) / mx; let hue = mx === r ? (g - b) / (mx - mn) : mx === g ? 2 + (b - r) / (mx - mn) : 4 + (r - g) / (mx - mn); hue = (hue * 60 + 360) % 360;
