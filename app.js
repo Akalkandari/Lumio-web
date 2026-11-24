@@ -733,7 +733,8 @@ async function getJSON(url, timeout = 15000) {
   for (let attempt = 0; ; attempt++) {
     const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), timeout);
     try {
-      const r = await fetch(url, { signal: ctl.signal });
+      // Lumio's own server (TMDB through tmdb-proxy) wants Lumio's public app key
+      const r = await fetch(url, url.startsWith(SB_URL) ? { signal: ctl.signal, headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } } : { signal: ctl.signal });
       if (r.ok) return await r.json();
       if ((r.status !== 429 && r.status < 500) || attempt >= 2) throw new Error('HTTP ' + r.status);
       const after = Number(r.headers.get('Retry-After')) * 1000;
@@ -775,15 +776,37 @@ function refreshTmdbKey(failed = TMDBKEY.now) {
     }).finally(() => { TMDBKEY.asking = null; }));
 }
 /** A TMDB request made with `make(key)`; when TMDB refuses Lumio's key (it was changed), the new key is fetched and it's tried once more. */
+/** Asking TMDB directly failed in a way Lumio's server can get round: refused key, busy/broken TMDB, or out of reach. Same as the apps. */
+function throughLumio(e) {
+  const m = /^HTTP (\d+)$/.exec((e && e.message) || ''); if (!m) return true;
+  const code = +m[1]; return code === 401 || code === 403 || code === 429 || code >= 500;
+}
+let tmdbDirectOffUntil = 0;
+/**
+ * A TMDB request made with `make(key)`. When TMDB refuses Lumio's key, the newest key is fetched and it's tried again;
+ * when that still fails (TMDB refusing or failing us from this network, or out of reach), `make(null)` goes through
+ * Lumio's server, and for 10 minutes after that, straight there. Your own key (Settings) is always used as it is.
+ */
 async function withTmdbKey(make) {
   const own = (S.tmdbKey || '').trim(), key = own || TMDBKEY.now;
+  if (!own && Date.now() < tmdbDirectOffUntil) return make(null);
   try { return await make(key); }
-  catch (e) { if (!own && e && e.message === 'HTTP 401' && await refreshTmdbKey(key)) return make(TMDBKEY.now); throw e; }
+  catch (e) {
+    if (own || !throughLumio(e)) throw e;
+    if (e.message === 'HTTP 401' && await refreshTmdbKey(key)) {
+      try { return await make(TMDBKEY.now); } catch (e2) { if (!throughLumio(e2)) throw e2; }
+    }
+    tmdbDirectOffUntil = Date.now() + 10 * 60e3;
+    return make(null);
+  }
 }
 const tmdb = path => withTmdbKey(key => tmdbWith(key, path));
 refreshTmdbKey();   // Lumio's current key, so a changed key never stops the catalog
+/** TMDB address for `path` with `key`; key null → through Lumio's server (tmdb-proxy adds Lumio's key). */
+const tmdbUrl = (key, path) => key ? `https://api.themoviedb.org/3/${path}${path.includes('?') ? '&' : '?'}api_key=${key}`
+  : `${SB_URL}/functions/v1/tmdb-proxy/3/${path}${path.includes('?') ? '&' : '?'}via=lumio`;
 function tmdbWith(key, path) {
-  const url = `https://api.themoviedb.org/3/${path}${path.includes('?') ? '&' : '?'}api_key=${key}&language=en-US`;
+  const url = `${tmdbUrl(key, path)}&language=en-US`;
   const ar = S.lang === 'ar' && !NO_TEXT.test(path), ck = ar ? url + '#ar' : url;
   if (!cache.has(ck)) cache.set(ck, (ar
     ? Promise.all([getJSON(url), getJSON(url.replace('language=en-US', 'language=ar')).catch(() => null)]).then(([e, a]) => a ? arText(e, a) : e)
@@ -1461,7 +1484,7 @@ async function upNext(type, id) {
   const k = type + '-' + id, hit = UP_CACHE.get(k);
   if (hit && Date.now() - hit.at < 3 * 3600e3) return hit.next;
   // one plain request: only dates and numbers are read, so no Arabic text is fetched alongside
-  const d = await withTmdbKey(key => getJSON(`https://api.themoviedb.org/3/${type}/${id}?api_key=${key}&language=en-US`));
+  const d = await withTmdbKey(key => getJSON(`${tmdbUrl(key, `${type}/${id}`)}&language=en-US`));
   const n = d.next_episode_to_air, next = type === 'tv' ? (n ? { date: n.air_date, season: n.season_number, episode: n.episode_number, name: n.name } : null) : (d.release_date ? { date: d.release_date } : null);
   UP_CACHE.set(k, { at: Date.now(), next });
   return next;
