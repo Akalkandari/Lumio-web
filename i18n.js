@@ -1164,5 +1164,14 @@ window.LUMIO_AR = {
 "Couldn't send the subtitles to the TV": "تعذّر إرسال الترجمة إلى التلفاز",
 "The TV couldn't take the subtitles": "لم يتمكن التلفاز من استقبال الترجمة",
 "Control Centre → Screen Mirroring: the TV shows Lumio with its subtitles": "مركز التحكم ← نسخ الشاشة: يعرض التلفاز Lumio مع ترجمته",
-"Plays it on the Apple TV and finds subtitles itself": "يشغّله على Apple TV ويجد الترجمة بنفسه"
+"Plays it on the Apple TV and finds subtitles itself": "يشغّله على Apple TV ويجد الترجمة بنفسه",
+"Top 10 movies on": "أفضل 10 أفلام على",
+"Top 10 series on": "أفضل 10 مسلسلات على",
+"Trending movies on": "أفلام رائجة على",
+"Trending series on": "مسلسلات رائجة على",
+"Newest movies on": "أحدث الأفلام على",
+"Newest series on": "أحدث المسلسلات على",
+"Popular movies on": "أفلام شائعة على",
+"Popular series on": "مسلسلات شائعة على",
+"Try another region (Settings → Region).": "جرّب منطقة أخرى (الإعدادات ← المنطقة)."
 };

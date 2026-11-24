@@ -1138,9 +1138,42 @@ function showcaseMix(tv, films, max = 6) {
   for (let i = 0; i < Math.max(a.length, b.length); i++) for (const x of [a[i], b[i]]) if (x && out.length < max && !seen.has(x.id)) { seen.add(x.id); out.push(x); }
   return out;
 }
+/** service_top10 rows → per kind, Netflix's own list for your country when there is one, else trending. Same as the apps' ServiceTop10. */
+function top10Parse(rows) {
+  const out = {};
+  for (const kind of ['movie', 'tv']) {
+    const mine = (Array.isArray(rows) ? rows : []).filter(r => r && r.kind === kind && r.top10_items && r.top10_items.item);
+    if (!mine.length) continue;
+    const source = mine.some(r => r.source === 'netflix') ? 'netflix' : mine[0].source;
+    const pick = mine.filter(r => r.source === source).sort((a, b) => a.rank - b.rank), seen = new Set(), items = [];
+    for (const r of pick) { const x = { ...r.top10_items.item, media_type: kind }; if (!seen.has(x.id)) { seen.add(x.id); items.push(x); } }
+    out[kind] = { source, week: (pick.find(r => r.week) || {}).week || null, items };
+  }
+  return out;
+}
+/** Row title before the service's name: Netflix's own list is a Top 10; the others are what's trending there. */
+const top10Label = (kind, source) => source === 'netflix' ? (kind === 'movie' ? 'Top 10 movies on' : 'Top 10 series on') : (kind === 'movie' ? 'Trending movies on' : 'Trending series on');
+/** TMDB discover filter: released in the last year (when a region has no list yet). */
+const recentFilter = (kind, today = new Date()) => { const d = new Date(today); d.setFullYear(d.getFullYear() - 1); return (kind === 'movie' ? 'primary_release_date' : 'first_air_date') + '.gte=' + d.toISOString().slice(0, 10); };
+const TOP10 = {};   // service + region → its lists, for 3 hours
+/** A service's Top 10 movies and series for your region (kept fresh by the service-top10 job), else its most popular titles of the last year. */
+function serviceTop10(s) {
+  const region = (s.region || S.region || 'US').toUpperCase(), k = s.key + '|' + region + '|' + s.ids, hit = TOP10[k];
+  if (hit && Date.now() - hit.at < 3 * 3600e3) return hit.p;
+  const p = fetch(`${SB_URL}/rest/v1/service_top10?select=kind,source,rank,week,top10_items(item)&service=eq.${encodeURIComponent(s.key)}&region=eq.${encodeURIComponent(region)}&order=kind.asc,source.asc,rank.asc`,
+    { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY }, cache: 'no-store' })
+    .then(r => r.ok ? r.json() : []).catch(() => []).then(top10Parse)
+    .then(got => Promise.all(['movie', 'tv'].map(kind => got[kind] && got[kind].items.length >= 3 ? got[kind]
+      : api.discover(kind, serviceQuery(s) + '&' + recentFilter(kind), 'popularity.desc', 1).catch(() => [])
+          .then(l => ({ source: 'recent', week: null, items: l.filter(x => x.poster_path).slice(0, 10) }))))
+    .then(([movie, tv]) => ({ movie, tv })));
+  TOP10[k] = { at: Date.now(), p };
+  p.then(v => { if (!v.movie.items.length && !v.tv.items.length) delete TOP10[k]; });
+  return p;
+}
 const SHOWCASE = {};   // service key + query → its picks, for this visit
 /**
- * Streaming Services, showcase style (like the apps): what's popular on each service slowly cross-fades behind its
+ * Streaming Services, showcase style (like the apps): each service's own top titles slowly cross-fades behind its
  * brand colour, with "Now: <title>" and a thin line counting down to the next. Pictures load when a card comes into
  * view; only cards on screen move, and nothing moves when motion is reduced.
  */
@@ -1171,8 +1204,7 @@ function mountShowcases(root, list) {
     card.addEventListener('showcase', run);
     const load = () => {
       const key = s.key + '|' + serviceQuery(s);
-      const got = SHOWCASE[key] || (SHOWCASE[key] = Promise.all(['tv', 'movie'].map(t => api.discover(t, serviceQuery(s), 'popularity.desc', 1).catch(() => [])))
-        .then(([tv, films]) => showcaseMix(tv, films)));
+      const got = SHOWCASE[key] || (SHOWCASE[key] = serviceTop10(s).then(t => showcaseMix(t.tv.items, t.movie.items)));   // its own top titles
       got.then(p => { if (!p.length) return; st.picks = p; show(0, true); run(); });
     };
     const io = new IntersectionObserver(es => es.forEach(e => {
@@ -1696,7 +1728,7 @@ async function channelsView(kind, key, token) {
   const src = kind === 'src' ? (S.iptv || []).find(p => p.id === key) : null;
   if (!cat && !src) { location.replace('#/livetv'); return; }
   const c1 = cat?.c1 || '#2563EB', c2 = cat?.c2 || '#0B1E45', title = cat ? T(cat.name) : src.name, emoji = cat?.emoji || (src.kind === 'xtream' ? '🔐' : '📃');
-  view.innerHTML = `<a class="icon-btn back" href="#" data-act="back" aria-label="Back">${ic('back')}</a>
+  const head = `<a class="icon-btn back" href="#" data-act="back" aria-label="Back">${ic('back')}</a>
     <div class="banner" style="--c1:${c1};--c2:${c2}"><canvas id="bn-scene"></canvas><div class="ttl"><span style="font-size:42px">${emoji}</span><div><h1>${esc(title)}</h1><p id="ch-count">${T('Loading channels…')}</p></div></div></div>
     <div id="ch-tools"></div><div class="gutter"><div class="grid ch-grid" id="ch-grid">${'<div class="sk" style="aspect-ratio:16/10;border-radius:16px"></div>'.repeat(8)}</div></div>`;
   GenreScenes.attach($('#bn-scene'), cat ? 'tv_' + cat.key : 'tv_playlist', 0);
@@ -1784,7 +1816,7 @@ async function catalogView(kind, key, token) {
   if (!info) { location.replace('#/home'); return; }
   if (info.service) {
     const list = await loadServices(); const s = list.find(x => x.key === key) || info.service;
-    const q = `with_watch_providers=${s.ids}&with_watch_monetization_types=flatrate${s.region ? '&watch_region=' + s.region : ''}`;
+    const q = serviceQuery(s);
     Object.assign(info, { service: s, mq: q, tq: q });
   }
   if (token !== routeToken) return;
@@ -1792,10 +1824,12 @@ async function catalogView(kind, key, token) {
   const st = { type: info.mq == null ? 'tv' : 'movie', sort: sorts[0][0], page: 0, items: [], loading: false, end: false };
   const titleHTML = info.decade ? decadeLabel(info.decade, true) : `<h1>${esc(info.service || info.studio ? info.title : T(info.title))}</h1>`;
   const subText = info.studio ? `${T('Films from')} ${info.title}` : info.decade ? (S.lang === 'ar' ? `${T('The best films of the')} ${T(info.title)}` : `The best films of the ${info.title}`) : null;
-  view.innerHTML = `<a class="icon-btn back" href="#" data-act="back" aria-label="Back">${ic('back')}</a>
+  const head = `<a class="icon-btn back" href="#" data-act="back" aria-label="Back">${ic('back')}</a>
     <div class="banner" style="--c1:${info.c1};--c2:${info.c2}">${info.row ? `<img class="kb" data-row="${info.row}" data-key="${key}" data-size="w1280" alt="" data-ok><i class="scrim"></i>` : ''}${info.franchise ? `<img class="kb" id="bn-art" data-art="${info.franchise.key}" data-size="w1280" alt="" data-ok><i class="scrim"></i>` : ''}${info.genre || info.scene ? `<canvas id="bn-scene" class="${info.decade ? 'era-fx' : ''}"></canvas>` : ''}${info.studio ? `<span class="slogo bn" data-art="${info.studio.key}"><i></i></span>` : ''}
       <div class="ttl">${info.service ? logoHTML(info.service, 0, 58) : (!info.genre && info.emoji ? `<span style="font-size:44px" class="emoji-b">${info.emoji}</span>` : '')}
-        <div>${titleHTML}<p>${esc(subText || (info.service ? `${T('Streaming now on')} ${info.title}` : info.genre ? (S.lang === 'ar' ? `أفضل عناوين ${T(info.title)}` : info.sub) : T(info.sub)))}</p></div></div></div>
+        <div>${titleHTML}<p>${esc(subText || (info.service ? `${T('Streaming now on')} ${info.title}` : info.genre ? (S.lang === 'ar' ? `أفضل عناوين ${T(info.title)}` : info.sub) : T(info.sub)))}</p></div></div></div>`;
+  if (info.service) { serviceRows(info, head, token); return; }
+  view.innerHTML = head + `
     <div class="gutter">
       ${info.mq != null && info.tq != null ? `<div class="chips" id="types"><button class="chip on" data-t="movie">${T("Movies")}</button><button class="chip" data-t="tv">${T("Shows")}</button></div>` : ''}
       ${info.sortable ? `<div class="chips" id="sorts" style="padding-top:2px">${sorts.map(([k, l], i) => `<button class="chip sm ${i ? '' : 'on'}" data-s="${k}">${T(l)}</button>`).join('')}</div>` : ''}
@@ -1840,6 +1874,37 @@ async function catalogView(kind, key, token) {
   view.querySelectorAll('#sorts .chip').forEach(b => b.onclick = () => { view.querySelectorAll('#sorts .chip').forEach(x => x.classList.toggle('on', x === b)); st.sort = b.dataset.s; reset(); });
   new IntersectionObserver(es => es[0].isIntersecting && load(), { rootMargin: '900px' }).observe($('#cmore'));
   load();
+}
+/**
+ * A streaming service's page, laid out like Home: its Top 10 movies and series (with rank numbers), then the newest and
+ * the most popular movies and series on it. Rows fill in as they arrive; a row with nothing in it is left out.
+ */
+function serviceRows(info, head, token) {
+  const s = info.service, q = serviceQuery(s);
+  const rows = [['top', 'movie'], ['top', 'tv'], ['new', 'movie'], ['new', 'tv'], ['pop', 'movie'], ['pop', 'tv']];
+  const sk = `<div class="rail-title gutter"><span class="sk sk-t"></span></div><div class="rail gutter">${'<div class="sk sk-p"></div>'.repeat(6)}</div>`;
+  view.innerHTML = head + rows.map(([r, k]) => `<section class="svc-row" id="sr-${r}-${k}">${sk}</section>`).join('') + '<div id="svc-none" hidden></div>';
+  if (info.genre || info.scene) GenreScenes.attach($('#bn-scene'), info.scene || info.genre, 0);
+  view.querySelectorAll('.banner [data-art]').forEach(fillArt);
+  let pending = rows.length, shown = 0;
+  const fill = (id, label, items, ranked) => {
+    const el = $('#sr-' + id); pending--;
+    if (token !== routeToken || !el) return;
+    const title = `${T(label)} ${s.name}`;
+    if (!items.length) el.remove();
+    else {
+      shown++;
+      el.innerHTML = ranked ? `<div class="rail-title gutter">${esc(title)}</div><div class="rail gutter ranked" style="--c1:${info.c1}">${items.slice(0, 10).map((x, i) => `<div class="rank-item"><span class="rank-n" aria-hidden="true">${i + 1}</span>${posterCard(x, i)}</div>`).join('')}</div>`
+        : `<div class="rail-title gutter">${esc(title)}</div><div class="rail gutter">${items.map((x, i) => posterCard(x, i)).join('')}</div>`;
+    }
+    if (!pending && !shown) { const n = $('#svc-none'); n.hidden = false; n.innerHTML = `<div class="gutter">${msg('Nothing here', 'Try another region (Settings → Region).')}</div>`; }
+  };
+  serviceTop10(s).then(t => ['movie', 'tv'].forEach(k => fill('top-' + k, top10Label(k, t[k].source), t[k].items, true)));
+  const sorts = { new: SORTS.find(x => x[0] === 'new'), pop: SORTS.find(x => x[0] === 'popular') };
+  const label = { new: { movie: 'Newest movies on', tv: 'Newest series on' }, pop: { movie: 'Popular movies on', tv: 'Popular series on' } };
+  for (const r of ['new', 'pop']) for (const k of ['movie', 'tv'])
+    api.discover(k, q, k === 'movie' ? sorts[r][2] : sorts[r][3], 1).catch(() => [])
+      .then(l => fill(`${r}-${k}`, label[r][k], l.filter(x => x.poster_path), false));
 }
 async function forYou() {
   const seeds = LIB.slice().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 6);

@@ -1109,3 +1109,18 @@ img.kb.ok { opacity: 1; }
 @keyframes showLine { to { transform: scaleX(1); } }
 @media (min-width: 700px) { .tile.service.show { width: 300px; height: 169px; } }
 @media (prefers-reduced-motion: reduce) { .show-pics img { transition: none; } .tile.show .show-pics img.on { animation: none; } }
+
+/* Streaming service page: Top 10 rows — each poster stands on its rank, a tall outlined number in the service's colour */
+.svc-row { min-height: 0; }
+.sk-t { display: inline-block; width: 180px; height: 18px; border-radius: 6px; }
+.sk-p { flex: none; width: var(--poster); aspect-ratio: 2 / 3; }
+.rail.ranked { gap: 10px; }
+.rank-item { display: flex; align-items: flex-end; flex: none; }
+.rank-n {
+  position: relative; z-index: 0; margin-right: -10px; padding: 0 .06em 30px 0; min-width: .62em; text-align: right;
+  font: 900 calc(var(--poster) * .98)/.8 system-ui, sans-serif; letter-spacing: -.06em;
+  color: transparent; -webkit-text-stroke: 2px rgba(255, 255, 255, .75);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c1, #fff) 55%, transparent), rgba(0, 0, 0, .2));
+  -webkit-background-clip: text; background-clip: text; user-select: none;
+}
+.rank-item .poster { position: relative; z-index: 1; }
