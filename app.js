@@ -757,8 +757,31 @@ function arText(en, ar) {
   }
   return en;
 }
-function tmdb(path) {
-  const key = (S.tmdbKey || '').trim() || BUILT_IN_TMDB_KEY;
+/**
+ * Lumio's TMDB key, used when you haven't set your own: from Lumio's server (Supabase → TMDB_KEY, function tmdb-key), so
+ * a new key works without a new website; kept for the next visit. Same as the apps' TmdbKey.
+ */
+const TMDBKEY = { now: (() => { try { const k = localStorage.getItem('lumio.tmdbKey') || ''; return /^[0-9a-f]{32}$/i.test(k) ? k : BUILT_IN_TMDB_KEY; } catch (e) { return BUILT_IN_TMDB_KEY; } })(), asking: null };
+/** Asks the server for the key (at start, or after TMDB refused `failed`); true when there's now a different key. One question at a time. */
+function refreshTmdbKey(failed = TMDBKEY.now) {
+  if (TMDBKEY.now !== failed) return Promise.resolve(true);
+  return TMDBKEY.asking || (TMDBKEY.asking = fetch(`${SB_URL}/functions/v1/tmdb-key`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null)
+    .then(j => {
+      const k = String((j && j.key) || '').trim();
+      if (!/^[0-9a-f]{32}$/i.test(k) || k === TMDBKEY.now) return false;
+      TMDBKEY.now = k; try { localStorage.setItem('lumio.tmdbKey', k); } catch (e) {}
+      return true;
+    }).finally(() => { TMDBKEY.asking = null; }));
+}
+/** A TMDB request made with `make(key)`; when TMDB refuses Lumio's key (it was changed), the new key is fetched and it's tried once more. */
+async function withTmdbKey(make) {
+  const own = (S.tmdbKey || '').trim(), key = own || TMDBKEY.now;
+  try { return await make(key); }
+  catch (e) { if (!own && e && e.message === 'HTTP 401' && await refreshTmdbKey(key)) return make(TMDBKEY.now); throw e; }
+}
+const tmdb = path => withTmdbKey(key => tmdbWith(key, path));
+refreshTmdbKey();   // Lumio's current key, so a changed key never stops the catalog
+function tmdbWith(key, path) {
   const url = `https://api.themoviedb.org/3/${path}${path.includes('?') ? '&' : '?'}api_key=${key}&language=en-US`;
   const ar = S.lang === 'ar' && !NO_TEXT.test(path), ck = ar ? url + '#ar' : url;
   if (!cache.has(ck)) cache.set(ck, (ar
@@ -1437,7 +1460,7 @@ async function upNext(type, id) {
   const k = type + '-' + id, hit = UP_CACHE.get(k);
   if (hit && Date.now() - hit.at < 3 * 3600e3) return hit.next;
   // one plain request: only dates and numbers are read, so no Arabic text is fetched alongside
-  const d = await getJSON(`https://api.themoviedb.org/3/${type}/${id}?api_key=${(S.tmdbKey || '').trim() || BUILT_IN_TMDB_KEY}&language=en-US`);
+  const d = await withTmdbKey(key => getJSON(`https://api.themoviedb.org/3/${type}/${id}?api_key=${key}&language=en-US`));
   const n = d.next_episode_to_air, next = type === 'tv' ? (n ? { date: n.air_date, season: n.season_number, episode: n.episode_number, name: n.name } : null) : (d.release_date ? { date: d.release_date } : null);
   UP_CACHE.set(k, { at: Date.now(), next });
   return next;
