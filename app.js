@@ -1140,14 +1140,14 @@ const logoHTML = (s, i, size) => s.logo ? `<span class="logo m-${s.motion}" styl
 const tileStyle = (c1, c2, i) => `--c1:${c1};--c2:${c2};--ang:${120 + (i * 37) % 120}deg;animation-delay:${i * 45}ms,0s`;
 
 function discoverSections() {
-  return `${sectionH('Discover', 'Curated lists, updated daily')}
-  <div class="rail gutter">${DISCOVER.map((d, i) => `<a class="tile discover ph" href="#/catalog/discover/${d.key}" style="${tileStyle(d.c1, d.c2, i)}">${photoBits('discover', d.key, DISCOVER_FX[d.key], i)}<span class="emoji" style="animation-delay:${i * .3}s">${d.emoji}</span><span class="lbl"><b>${esc(T(d.name))}</b><small>${esc(T(d.sub))}</small></span></a>`).join('')}</div>
-  ${sectionH('Streaming Services', 'Browse every catalog')}
+  return `${sectionH('Streaming Services', 'Browse every catalog')}
   <div class="rail gutter" id="services-rail">${servicesHTML(SERVICES.filter(s => s.logo))}</div>
-  ${sectionH('Genres', 'Something for every mood')}
-  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre ph" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}">${photoBits('genres', g.key, GENRE_FX[g.key] || 'sheen', i)}<span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>
+  ${sectionH('Discover', 'Curated lists, updated daily')}
+  <div class="rail gutter">${DISCOVER.map((d, i) => `<a class="tile discover ph" href="#/catalog/discover/${d.key}" style="${tileStyle(d.c1, d.c2, i)}">${photoBits('discover', d.key, DISCOVER_FX[d.key], i)}<span class="emoji" style="animation-delay:${i * .3}s">${d.emoji}</span><span class="lbl"><b>${esc(T(d.name))}</b><small>${esc(T(d.sub))}</small></span></a>`).join('')}</div>
   ${sectionH('Franchises', 'Every saga, film by film')}
   <div class="rail gutter">${FRANCHISES.map(franchiseTile).join('')}</div>
+  ${sectionH('Genres', 'Something for every mood')}
+  <div class="rail gutter">${GENRES.map((g, i) => `<a class="tile genre ph" href="#/catalog/genre/${g.key}" style="${tileStyle(g.c1, g.c2, i)}">${photoBits('genres', g.key, GENRE_FX[g.key] || 'sheen', i)}<span class="lbl"><b>${esc(T(g.name))}</b></span></a>`).join('')}</div>
   ${sectionH('Production Studios', 'The studios behind the movies')}
   <div class="rail gutter">${STUDIOS.map(studioTile).join('')}</div>
   ${sectionH('Decades', 'Movies from every era')}
