@@ -1084,3 +1084,28 @@ img.kb.ok { opacity: 1; }
   .lift-opts { grid-row: 1 / 3; grid-column: 2; }
 }
 @media (prefers-reduced-motion: reduce) { .lift-bg, .lift-card, .lift-opts, .lift-opt { animation: none; opacity: 1; } }
+
+/* Streaming Services, showcase style: what's on each service cross-fades behind its brand colour */
+.tile.service.show { width: 240px; height: 135px; padding: 0; display: block; animation-name: tileIn; }
+.tile.service.show::before { display: none; }
+.show-pics, .show-wash { position: absolute; inset: 0; }
+.show-pics img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transform: scale(1.04); transition: opacity .9s cubic-bezier(.4,0,.2,1); }
+.show-pics img.on { opacity: 1; }
+.tile.show.cycling .show-pics img.on { animation: showDrift 16s ease-in-out infinite alternate; }
+@keyframes showDrift { from { transform: scale(1.04) translateX(-5px); } to { transform: scale(1.08) translateX(5px); } }
+.show-wash { background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--c1) 18%, transparent) 40%, color-mix(in srgb, var(--c2) 45%, #000) 100%),
+  linear-gradient(to right, color-mix(in srgb, var(--c2) 40%, rgba(0,0,0,.6)), transparent 70%); }
+.show-lbl { position: absolute; left: 10px; right: 10px; bottom: 12px; display: flex; align-items: center; gap: 9px; z-index: 1; min-width: 0; }
+.show-lbl > span { min-width: 0; }
+.show-logo { width: 34px; height: 34px; border-radius: 9px; flex: 0 0 auto; object-fit: cover; background: var(--c1); }
+.show-lbl b { display: block; font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.show-lbl small { display: block; font-size: 11px; opacity: .78; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.show-lbl small.tick { animation: showTick .5s ease-out; }
+@keyframes showTick { from { opacity: 0; transform: translateY(6px); } }
+.show-line { position: absolute; left: 10px; right: 10px; bottom: 5px; height: 2px; border-radius: 1px; background: rgba(255,255,255,.22); opacity: 0; transition: opacity .3s; }
+.tile.show.cycling .show-line { opacity: 1; }
+.show-line i { display: block; height: 100%; background: #fff; transform-origin: left; transform: scaleX(0); }
+.show-line.go i { animation: showLine 4.2s linear forwards; }
+@keyframes showLine { to { transform: scaleX(1); } }
+@media (min-width: 700px) { .tile.service.show { width: 300px; height: 169px; } }
+@media (prefers-reduced-motion: reduce) { .show-pics img { transition: none; } .tile.show .show-pics img.on { animation: none; } }

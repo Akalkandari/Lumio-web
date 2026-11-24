@@ -1130,12 +1130,64 @@ function discoverSections() {
   ${sectionH('Decades', 'Movies from every era')}
   <div class="rail gutter">${DECADES.map(decadeTile).join('')}</div>`;
 }
-const servicesHTML = list => list.map((s, i) => `<a class="tile service" href="#/catalog/service/${s.key}" style="${tileStyle(s.c1, s.c2, i)}">${logoHTML(s, i)}<b>${esc(s.name)}</b></a>`).join('');
+/** TMDB discover filter for what's streaming on a service (its region's catalog for regional services abroad). Same as the apps. */
+const serviceQuery = s => `with_watch_providers=${s.ids}&with_watch_monetization_types=flatrate${s.region ? '&watch_region=' + s.region : ''}`;
+/** A service's most popular series and films, taking turns; only ones with a picture, each once, at most `max`. Same as the apps. */
+function showcaseMix(tv, films, max = 6) {
+  const a = tv.filter(x => x.backdrop_path), b = films.filter(x => x.backdrop_path), out = [], seen = new Set();
+  for (let i = 0; i < Math.max(a.length, b.length); i++) for (const x of [a[i], b[i]]) if (x && out.length < max && !seen.has(x.id)) { seen.add(x.id); out.push(x); }
+  return out;
+}
+const SHOWCASE = {};   // service key + query → its picks, for this visit
+/**
+ * Streaming Services, showcase style (like the apps): what's popular on each service slowly cross-fades behind its
+ * brand colour, with "Now: <title>" and a thin line counting down to the next. Pictures load when a card comes into
+ * view; only cards on screen move, and nothing moves when motion is reduced.
+ */
+const servicesHTML = list => list.map((s, i) => `<a class="tile service show" href="#/catalog/service/${s.key}" data-svc="${s.key}" style="${tileStyle(s.c1, s.c2, i)}">
+  <span class="show-pics"></span><span class="show-wash"></span>
+  <span class="show-lbl">${s.logo ? `<img class="show-logo" src="${IMG}w154${s.logo}" alt="">` : '<i class="show-logo"></i>'}<span><b>${esc(s.name)}</b><small>${esc(T('Streaming now'))}</small></span></span>
+  <span class="show-line"><i></i></span></a>`).join('');
+function mountShowcases(root, list) {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  root.querySelectorAll('.tile.show').forEach((card, i) => {
+    const s = list.find(x => x.key === card.dataset.svc); if (!s || card._show) return;
+    const st = card._show = { at: 0, picks: null, timer: 0, seen: false, first: true };
+    const pics = $('.show-pics', card), now = $('.show-lbl small', card), line = $('.show-line', card);
+    const show = (k, first) => {
+      const p = st.picks[k], img = new Image();
+      img.alt = ''; img.className = first ? 'on' : ''; img.src = `${IMG}w780${p.backdrop_path}`;
+      img.onload = () => { requestAnimationFrame(() => img.classList.add('on')); setTimeout(() => { [...pics.children].slice(0, -1).forEach(o => o.remove()); }, 1000); };
+      pics.appendChild(img);
+      now.textContent = `${T('Now')}: ${titleOf(p)}`; now.classList.remove('tick'); void now.offsetWidth; now.classList.add('tick');
+    };
+    const run = () => {
+      clearTimeout(st.timer);
+      if (still || !st.seen || document.hidden || !st.picks || st.picks.length < 2) { card.classList.remove('cycling'); return; }
+      card.classList.add('cycling'); line.classList.remove('go'); void line.offsetWidth; line.classList.add('go');
+      st.timer = setTimeout(() => { st.at = (st.at + 1) % st.picks.length; show(st.at); run(); }, 4200 + (st.first ? 900 * (i % 5) : 0));   // the cards don't all change at once
+      st.first = false;
+    };
+    card.addEventListener('showcase', run);
+    const load = () => {
+      const key = s.key + '|' + serviceQuery(s);
+      const got = SHOWCASE[key] || (SHOWCASE[key] = Promise.all(['tv', 'movie'].map(t => api.discover(t, serviceQuery(s), 'popularity.desc', 1).catch(() => [])))
+        .then(([tv, films]) => showcaseMix(tv, films)));
+      got.then(p => { if (!p.length) return; st.picks = p; show(0, true); run(); });
+    };
+    const io = new IntersectionObserver(es => es.forEach(e => {
+      st.seen = e.isIntersecting;
+      if (st.seen && !st.picks) load(); else run();
+    }), { rootMargin: '0px 200px' });
+    io.observe(card);
+  });
+  if (!mountShowcases.vis) { mountShowcases.vis = true; document.addEventListener('visibilitychange', () => document.querySelectorAll('.tile.show').forEach(c => c._show && c.dispatchEvent(new Event('showcase')))); }
+}
 function mountDiscover(root) {
   root.querySelectorAll('canvas[data-scene]').forEach(c => window.GenreScenes && GenreScenes.attach(c, c.dataset.scene, +c.dataset.i));
   root.querySelectorAll('[data-art]').forEach(el => artObserver ? artObserver.observe(el) : fillArt(el));
   fillRowArt(root);
-  loadServices().then(list => { const r = $('#services-rail', root); if (r) r.innerHTML = servicesHTML(list); });
+  loadServices().then(list => { const r = $('#services-rail', root); if (r) { r.innerHTML = servicesHTML(list); mountShowcases(r, list); } });
 }
 
 // ============================================================================ router

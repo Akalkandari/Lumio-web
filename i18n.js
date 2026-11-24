@@ -1119,6 +1119,7 @@ window.LUMIO_AR = {
 "No other copy to try": "لا توجد نسخة أخرى للتجربة",
 "Casting controls": "التحكم في البث",
 "Cast|to TV": "بث",
+"Streaming now": "يُعرض الآن",
 "Subtitles matched to the voices": "تمت مطابقة الترجمة مع الأصوات",
 "These subtitles are matched to the voices": "هذه الترجمة مطابقة للأصوات",
 "Matched to the voices": "مطابقة للأصوات",
