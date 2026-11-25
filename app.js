@@ -1305,6 +1305,9 @@ function placeLamp(nav, instant) {
 addEventListener('resize', () => { const n = $('#nav'); if (n) placeLamp(n, true); });
 let lastHash = '';
 async function route() {
+  // lumiotv.github.io/#/privacy and #/terms: the policies over whatever's open (links on Google's sign-in screen)
+  const doc = (location.hash.match(/^#\/(privacy|terms)\/?$/) || [])[1];
+  if (doc) { history.replaceState(null, '', location.pathname + (lastHash && !/privacy|terms/.test(lastHash) ? lastHash : '#/home')); docSheet(doc); return; }
   if (!SESSION) { loginView(); return; }
   if (!PROFILE_CHOSEN) { profilesView(); return; }
   const hash = location.hash || '#/home';
@@ -4542,6 +4545,8 @@ applyTheme(); applyLang();
 playIntro();
 if (location.hash === '#/play') history.replaceState(null, '', '#/home');
 let PENDING_PARTY = (location.hash.match(/^#\/party\/([A-Za-z0-9]{4,8})/) || [])[1] || null;
+const DOC = (location.hash.match(/^#\/(privacy|terms)\/?$/) || [])[1];   // opened from a Privacy / Terms link
+if (DOC) history.replaceState(null, '', location.pathname + '#/home');
 const OAUTH = oauthReturn(), RECOVERY = OAUTH ? null : recoveryLink(), CONFIRMED = confirmLink();
 if (OAUTH) oauthSignIn(OAUTH);                        // back from Google / Apple
 else if (RECOVERY) newPasswordView(RECOVERY);         // opened from a "reset your password" email
@@ -4553,6 +4558,7 @@ else {
   // Fetch the latest from the account (changes made on the phone app or another browser)
   refreshFromCloud();
 }
+if (DOC) docSheet(DOC);
 /**
  * Startup animation: the wand writes the L and the light blooms (same video as the apps, portrait or landscape to
  * fit the screen). Once per visit, only when opening the site normally; any key, click or tap skips it.
