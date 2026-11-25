@@ -3573,12 +3573,17 @@ function signInShell() {
   heroArt($('#shero', w));
   return w;
 }
-/** Trending backdrops, one at a time, slowly drifting and cross-fading (still for reduced motion). */
+/**
+ * Trending artwork, one at a time, slowly drifting and cross-fading (still for reduced motion): the poster where the
+ * space is tall (a phone held upright: it fits with almost nothing cut off), the wide backdrop elsewhere.
+ */
 async function heroArt(el) {
   let list = [];
-  try { list = (await api.trending('all', 'week')).filter(x => x.backdrop_path).slice(0, 6); } catch { return; }
+  try { list = (await api.trending('all', 'week')).filter(x => x.backdrop_path && x.poster_path).slice(0, 6); } catch { return; }
   if (!list.length || !el.isConnected) return;
-  el.innerHTML = list.map((x, i) => `<img src="${IMG}w1280${esc(x.backdrop_path)}" alt="" class="${i ? '' : 'on'}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}>`).join('');
+  const tall = el.clientHeight > el.clientWidth;
+  el.classList.toggle('tall', tall);
+  el.innerHTML = list.map((x, i) => `<img src="${IMG}${tall ? 'w780' + esc(x.poster_path) : 'w1280' + esc(x.backdrop_path)}" alt="" class="${i ? '' : 'on'}" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}>`).join('');
   if (matchMedia('(prefers-reduced-motion: reduce)').matches || list.length < 2) return;
   let i = 0;
   const t = setInterval(() => {
