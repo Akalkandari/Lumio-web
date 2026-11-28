@@ -1348,14 +1348,16 @@ function placeLamp(nav, instant) {
  */
 function railScreen(w, h, touch, iphone) {
   const long = Math.max(w, h), short = Math.min(w, h);
-  return !!touch && !!iphone && short > 0 && long <= 780 && long / short <= 1.5;
+  return !!touch && !!iphone && short > 0 && long <= 860 && long / short <= 1.6;   // room for the real sizes, which Apple hasn't published
 }
 /* screen-shape helpers: end */
 const touchScreen = matchMedia('(pointer: coarse)');
+/** An iPhone, also when its Safari asks for the computer version of sites (it then says "Macintosh", like an iPad). */
+const appleTouch = () => /iPhone/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 /** Folding, unfolding or turning the phone re-shapes the page at once (not while typing: the keyboard shrinks the window). */
 function applyScreenShape() {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-  const on = railScreen(innerWidth, innerHeight, touchScreen.matches, /iPhone/.test(navigator.userAgent));
+  const on = railScreen(innerWidth, innerHeight, touchScreen.matches, appleTouch());
   const root = document.documentElement;     // "duo-rail": not "rail", which is the name of the scrolling rows
   if (!typing && root.classList.contains('duo-rail') !== on) root.classList.toggle('duo-rail', on);
   const n = $('#nav'); if (n) placeLamp(n, true);
@@ -1363,8 +1365,24 @@ function applyScreenShape() {
 applyScreenShape();
 addEventListener('resize', applyScreenShape);
 touchScreen.addEventListener?.('change', applyScreenShape);
+/** lumiotv.github.io/#/screen — the numbers that decide the layout; updates live as you fold, unfold and turn. */
+function screenInfo() {
+  const box = document.getElementById('view');
+  const draw = () => {
+    if (location.hash !== '#/screen') return removeEventListener('resize', draw);
+    const rows = [['Window', `${innerWidth} × ${innerHeight}`], ['Screen', `${screen.width} × ${screen.height}`], ['Pixel ratio', devicePixelRatio],
+      ['Touch', `${touchScreen.matches ? 'yes' : 'no'} (${navigator.maxTouchPoints} points)`], ['Apple phone', appleTouch() ? 'yes' : 'no'],
+      ['Side rail', document.documentElement.classList.contains('duo-rail') ? 'on' : 'off'], ['Browser', navigator.userAgent]];
+    box.innerHTML = `<div class="gutter" style="padding-top:calc(20px + var(--safe-t))"><h2>Screen</h2><p class="dim">Fold or turn the phone: this updates. Send a screenshot.</p>
+      <div class="card" style="margin-top:12px">${rows.map(([k, v]) => `<div class="set-row" style="display:block"><small class="dim">${esc(k)}</small><div style="word-break:break-all">${esc(String(v))}</div></div>`).join('')}</div>
+      <p style="margin-top:16px"><a class="btn tonal" href="#/home">Home</a></p></div>`;
+  };
+  addEventListener('resize', draw); draw();
+}
 let lastHash = '';
 async function route() {
+  // lumiotv.github.io/#/screen: what this screen tells websites (to tune the layouts for new phones like the iPhone Duo)
+  if (location.hash === '#/screen') return screenInfo();
   // lumiotv.github.io/#/privacy and #/terms: the policies over whatever's open (links on Google's sign-in screen)
   const doc = (location.hash.match(/^#\/(privacy|terms)\/?$/) || [])[1];
   if (doc) { history.replaceState(null, '', location.pathname + (lastHash && !/privacy|terms/.test(lastHash) ? lastHash : '#/home')); docSheet(doc); return; }
