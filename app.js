@@ -1334,11 +1334,35 @@ function placeLamp(nav, instant) {
   if (!on) { lamp.style.opacity = 0; return; }
   if (instant) lamp.style.transition = 'none';
   lamp.style.opacity = 1;
-  lamp.style.transform = `translateX(${on.offsetLeft + on.offsetWidth / 2}px)`;
+  lamp.style.transform = document.documentElement.classList.contains('rail')
+    ? `translateY(${on.offsetTop + on.offsetHeight / 2}px)` : `translateX(${on.offsetLeft + on.offsetWidth / 2}px)`;
   nav.dataset.lit = '1';
   if (instant) { void lamp.offsetWidth; lamp.style.transition = ''; }
 }
-addEventListener('resize', () => { const n = $('#nav'); if (n) placeLamp(n, true); });
+/* screen-shape helpers: begin */
+/**
+ * A small, nearly square touch screen, like the iPhone Duo's outer screen when it's folded: there iOS moves the
+ * controls to the side, so Lumio's bar becomes a rail down the right edge, under your thumb. Ordinary phones are
+ * twice as tall as wide, and unfolded screens, tablets and laptops are bigger, so they keep the bar at the bottom.
+ * Sizes in CSS pixels.
+ */
+function railScreen(w, h, touch) {
+  const long = Math.max(w, h), short = Math.min(w, h);
+  return !!touch && short > 0 && long <= 780 && long / short <= 1.5;
+}
+/* screen-shape helpers: end */
+const touchScreen = matchMedia('(pointer: coarse)');
+/** Folding, unfolding or turning the phone re-shapes the page at once (not while typing: the keyboard shrinks the window). */
+function applyScreenShape() {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+  const on = railScreen(innerWidth, innerHeight, touchScreen.matches);
+  const root = document.documentElement;
+  if (!typing && root.classList.contains('rail') !== on) root.classList.toggle('rail', on);
+  const n = $('#nav'); if (n) placeLamp(n, true);
+}
+applyScreenShape();
+addEventListener('resize', applyScreenShape);
+touchScreen.addEventListener?.('change', applyScreenShape);
 let lastHash = '';
 async function route() {
   // lumiotv.github.io/#/privacy and #/terms: the policies over whatever's open (links on Google's sign-in screen)
@@ -2138,7 +2162,7 @@ async function detailsView(type, id, token) {
   const d = await api.details(type, id);
   if (token !== routeToken) return;
   const e = libEntry(type, id), resume = isContinue(e) ? e : null;
-  const tall = innerHeight > innerWidth * 1.1;                       // a phone held upright: the poster fills the top
+  let tall = innerHeight > innerWidth * 1.1;                         // a phone held upright: the poster fills the top
   const hero = heroPick(d.images, d.backdrop_path, d.poster_path, tall);
   const heroSrc = hero.path && IMG + (hero.portrait ? 'w780' : innerWidth >= 1000 ? 'original' : 'w1280') + hero.path;
   const seasons = (d.seasons || []).filter(s => s.season_number > 0);
@@ -2208,6 +2232,16 @@ async function detailsView(type, id, token) {
     if (trailerOn && detailTrailer && away !== paused) { paused = away; detailTrailer.cmd(away ? 'pauseVideo' : 'playVideo'); }
   };
   addEventListener('scroll', onScroll, { passive: true });
+  // folding, unfolding or turning the phone: the poster or the wide picture again, to fit the new shape
+  const reshape = () => {
+    if (!top.isConnected) return removeEventListener('resize', reshape);
+    const t2 = innerHeight > innerWidth * 1.1; if (t2 === tall) return;
+    tall = t2;
+    const h2 = heroPick(d.images, d.backdrop_path, d.poster_path, tall), im = $('.tp-pic img', top);
+    top.classList.toggle('portrait', h2.portrait);
+    if (im && h2.path) im.src = IMG + (h2.portrait ? 'w780' : innerWidth >= 1000 ? 'original' : 'w1280') + h2.path;
+  };
+  addEventListener('resize', reshape);
   // Watch: the best stream straight away; hold / right-click: the sources list
   tapOrHold($('#d-play'), () => quickPlay(type, id, ps, pe), () => { location.hash = playHref; });
   $('#d-dl').onclick = () => downloadSheet(type, id, type === 'tv' ? season : null);
@@ -2869,6 +2903,7 @@ function navIsland(force) {
   const pp = $('.ni-pp', inner), was = pp.dataset.p;
   if (was !== String(live.playing)) { pp.dataset.p = String(live.playing); pp.innerHTML = ic(live.playing ? 'pause' : 'play'); }
   $('.ni-bar i', inner).style.width = (live.progress * 100).toFixed(1) + '%';
+  inner.style.setProperty('--p', live.progress.toFixed(3));           // the side rail shows it as a ring round the picture
 }
 function castUpdate() {
   castFab();
