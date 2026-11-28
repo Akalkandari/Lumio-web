@@ -1334,30 +1334,30 @@ function placeLamp(nav, instant) {
   if (!on) { lamp.style.opacity = 0; return; }
   if (instant) lamp.style.transition = 'none';
   lamp.style.opacity = 1;
-  lamp.style.transform = document.documentElement.classList.contains('rail')
+  lamp.style.transform = document.documentElement.classList.contains('duo-rail')
     ? `translateY(${on.offsetTop + on.offsetHeight / 2}px)` : `translateX(${on.offsetLeft + on.offsetWidth / 2}px)`;
   nav.dataset.lit = '1';
   if (instant) { void lamp.offsetWidth; lamp.style.transition = ''; }
 }
 /* screen-shape helpers: begin */
 /**
- * A small, nearly square touch screen, like the iPhone Duo's outer screen when it's folded: there iOS moves the
- * controls to the side, so Lumio's bar becomes a rail down the right edge, under your thumb. Ordinary phones are
- * twice as tall as wide, and unfolded screens, tablets and laptops are bigger, so they keep the bar at the bottom.
- * Sizes in CSS pixels.
+ * The iPhone Duo's outer screen when it's folded: a small, nearly square iPhone screen, where iOS moves the controls
+ * to the side, so Lumio's bar becomes a rail down the right edge, under your thumb. Only on an iPhone: a Galaxy
+ * Fold's cover screen has a similar shape once the browser's bars take their space, and keeps the phone layout.
+ * Ordinary iPhones are twice as tall as wide, and the unfolded screen is bigger: bar at the bottom. CSS pixels.
  */
-function railScreen(w, h, touch) {
+function railScreen(w, h, touch, iphone) {
   const long = Math.max(w, h), short = Math.min(w, h);
-  return !!touch && short > 0 && long <= 780 && long / short <= 1.5;
+  return !!touch && !!iphone && short > 0 && long <= 780 && long / short <= 1.5;
 }
 /* screen-shape helpers: end */
 const touchScreen = matchMedia('(pointer: coarse)');
 /** Folding, unfolding or turning the phone re-shapes the page at once (not while typing: the keyboard shrinks the window). */
 function applyScreenShape() {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-  const on = railScreen(innerWidth, innerHeight, touchScreen.matches);
-  const root = document.documentElement;
-  if (!typing && root.classList.contains('rail') !== on) root.classList.toggle('rail', on);
+  const on = railScreen(innerWidth, innerHeight, touchScreen.matches, /iPhone/.test(navigator.userAgent));
+  const root = document.documentElement;     // "duo-rail": not "rail", which is the name of the scrolling rows
+  if (!typing && root.classList.contains('duo-rail') !== on) root.classList.toggle('duo-rail', on);
   const n = $('#nav'); if (n) placeLamp(n, true);
 }
 applyScreenShape();
