@@ -1334,55 +1334,13 @@ function placeLamp(nav, instant) {
   if (!on) { lamp.style.opacity = 0; return; }
   if (instant) lamp.style.transition = 'none';
   lamp.style.opacity = 1;
-  lamp.style.transform = document.documentElement.classList.contains('duo-rail')
-    ? `translateY(${on.offsetTop + on.offsetHeight / 2}px)` : `translateX(${on.offsetLeft + on.offsetWidth / 2}px)`;
+  lamp.style.transform = `translateX(${on.offsetLeft + on.offsetWidth / 2}px)`;
   nav.dataset.lit = '1';
   if (instant) { void lamp.offsetWidth; lamp.style.transition = ''; }
 }
-/* screen-shape helpers: begin */
-/**
- * The iPhone Duo's outer screen when it's folded: a small, nearly square iPhone screen, where iOS moves the controls
- * to the side, so Lumio's bar becomes a rail down the right edge, under your thumb. Only on an iPhone: a Galaxy
- * Fold's cover screen has a similar shape once the browser's bars take their space, and keeps the phone layout.
- * Ordinary iPhones are twice as tall as wide, and the unfolded screen is bigger: bar at the bottom. CSS pixels.
- */
-function railScreen(w, h, touch, iphone) {
-  const long = Math.max(w, h), short = Math.min(w, h);
-  return !!touch && !!iphone && short > 0 && long <= 860 && long / short <= 1.6;   // room for the real sizes, which Apple hasn't published
-}
-/* screen-shape helpers: end */
-const touchScreen = matchMedia('(pointer: coarse)');
-/** An iPhone, also when its Safari asks for the computer version of sites (it then says "Macintosh", like an iPad). */
-const appleTouch = () => /iPhone/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-/** Folding, unfolding or turning the phone re-shapes the page at once (not while typing: the keyboard shrinks the window). */
-function applyScreenShape() {
-  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-  const on = railScreen(innerWidth, innerHeight, touchScreen.matches, appleTouch());
-  const root = document.documentElement;     // "duo-rail": not "rail", which is the name of the scrolling rows
-  if (!typing && root.classList.contains('duo-rail') !== on) root.classList.toggle('duo-rail', on);
-  const n = $('#nav'); if (n) placeLamp(n, true);
-}
-applyScreenShape();
-addEventListener('resize', applyScreenShape);
-touchScreen.addEventListener?.('change', applyScreenShape);
-/** lumiotv.github.io/#/screen — the numbers that decide the layout; updates live as you fold, unfold and turn. */
-function screenInfo() {
-  const box = document.getElementById('view');
-  const draw = () => {
-    if (location.hash !== '#/screen') return removeEventListener('resize', draw);
-    const rows = [['Window', `${innerWidth} × ${innerHeight}`], ['Screen', `${screen.width} × ${screen.height}`], ['Pixel ratio', devicePixelRatio],
-      ['Touch', `${touchScreen.matches ? 'yes' : 'no'} (${navigator.maxTouchPoints} points)`], ['Apple phone', appleTouch() ? 'yes' : 'no'],
-      ['Side rail', document.documentElement.classList.contains('duo-rail') ? 'on' : 'off'], ['Browser', navigator.userAgent]];
-    box.innerHTML = `<div class="gutter" style="padding-top:calc(20px + var(--safe-t))"><h2>Screen</h2><p class="dim">Fold or turn the phone: this updates. Send a screenshot.</p>
-      <div class="card" style="margin-top:12px">${rows.map(([k, v]) => `<div class="set-row" style="display:block"><small class="dim">${esc(k)}</small><div style="word-break:break-all">${esc(String(v))}</div></div>`).join('')}</div>
-      <p style="margin-top:16px"><a class="btn tonal" href="#/home">Home</a></p></div>`;
-  };
-  addEventListener('resize', draw); draw();
-}
+addEventListener('resize', () => { const n = $('#nav'); if (n) placeLamp(n, true); });
 let lastHash = '';
 async function route() {
-  // lumiotv.github.io/#/screen: what this screen tells websites (to tune the layouts for new phones like the iPhone Duo)
-  if (location.hash === '#/screen') return screenInfo();
   // lumiotv.github.io/#/privacy and #/terms: the policies over whatever's open (links on Google's sign-in screen)
   const doc = (location.hash.match(/^#\/(privacy|terms)\/?$/) || [])[1];
   if (doc) { history.replaceState(null, '', location.pathname + (lastHash && !/privacy|terms/.test(lastHash) ? lastHash : '#/home')); docSheet(doc); return; }
@@ -2921,7 +2879,6 @@ function navIsland(force) {
   const pp = $('.ni-pp', inner), was = pp.dataset.p;
   if (was !== String(live.playing)) { pp.dataset.p = String(live.playing); pp.innerHTML = ic(live.playing ? 'pause' : 'play'); }
   $('.ni-bar i', inner).style.width = (live.progress * 100).toFixed(1) + '%';
-  inner.style.setProperty('--p', live.progress.toFixed(3));           // the side rail shows it as a ring round the picture
 }
 function castUpdate() {
   castFab();

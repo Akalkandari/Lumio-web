@@ -1364,27 +1364,3 @@ body:has(.glass-nav.island) #view:not(.no-nav) { padding-bottom: calc(var(--nav-
   .pop.pin .pad { width: 100%; max-width: 360px; }
 }
 @keyframes pinUp { from { transform: translateY(100%); } to { transform: none; } }
-
-/* ---------------- Folded iPhone Duo (small, nearly square touch screens): the bar is a rail on the right edge, under
-   the thumb, like iOS moves its controls to the side there. Turns on and off live as you fold and unfold. */
-.duo-rail .glass-nav { left: auto; right: max(8px, var(--safe-r)); top: 50%; bottom: auto; transform: translateY(-50%); padding: 5px; }
-.duo-rail .glass-nav.hidden { transform: translate(160%, -50%); }
-.duo-rail .nav-row { flex-direction: column; }
-.duo-rail .nav-item { width: 48px; height: 50px; }
-.duo-rail .glass-nav.compact .nav-item { width: 42px; height: 44px; }
-.duo-rail .nav-lamp { left: 0; right: 0; top: 0; bottom: auto; width: auto; height: 76px; margin: -38px 0 0; }
-.duo-rail .glass-nav.compact .nav-lamp { width: auto; height: 64px; margin: -32px 0 0; }
-.duo-rail .nav-lamp::before { left: auto; right: 0; top: 50%; width: 3px; height: 30px; margin: -15px 0 0; border-radius: 4px 0 0 4px; }
-.duo-rail .nav-lamp::after { inset: 0 2px 0 0; clip-path: polygon(100% 29%, 100% 71%, 0 100%, 0 0);
-  background: linear-gradient(to left, color-mix(in srgb, var(--accent) 62%, transparent), color-mix(in srgb, var(--accent) 18%, transparent) 62%, transparent); }
-/* its island: the picture with a ring of progress round it, play/pause under it (tap the picture for the controls) */
-.duo-rail .nav-island > div { grid-template-columns: 1fr; justify-items: center; gap: 6px; padding: 4px 0 8px; }
-.duo-rail .ni-txt, .duo-rail .ni-bar { display: none; }
-.duo-rail .ni-open { padding: 3px; border-radius: 50%; background: conic-gradient(var(--accent) calc(var(--p, 0) * 1turn), rgba(255,255,255,.14) 0); }
-.duo-rail .ni-pic { width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 0 0 2px color-mix(in srgb, var(--s1) 90%, #000); }
-.duo-rail .ni-pp { width: 32px; height: 32px; margin: 0; }
-.duo-rail .ni-pp svg { width: 18px; height: 18px; }
-/* the page makes room on the right instead of at the bottom */
-.duo-rail #view:not(.no-nav) { padding-bottom: calc(28px + var(--safe-b)); padding-right: calc(66px + var(--safe-r)); }
-.duo-rail body:has(.glass-nav.island) #view:not(.no-nav) { padding-bottom: calc(28px + var(--safe-b)); }
-.duo-rail .cast-fab { right: calc(74px + var(--safe-r)); bottom: calc(18px + var(--safe-b)); }
